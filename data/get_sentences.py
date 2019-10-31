@@ -23,7 +23,10 @@ if __name__ == '__main__':
     for line in lines:
         row = line.strip().split(',')
         labels = ' '.join(row[1:])           ## First column is image filename
-        labels = re.sub("[^A-Za-z0-9']+", ' ', str(labels)).lower()  ## Only alphanumeric characters
+        labels = re.sub(r"[^A-Za-z0-9']+", " ", str(labels)).lower()  ## Only alphanumeric characters
+        labels = re.sub(r"\b[a-zA-Z]\b", " ", labels)                ## Replace single letters
+        labels = re.sub("   ", " ", labels)                          ## Go one space
+        labels = re.sub("  ", " ", labels)                           ## Go one space
         all_labels.append(labels + '\n')
 
     with open(OUTPUT_FILE, 'w') as f:
