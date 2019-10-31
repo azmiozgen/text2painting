@@ -5,3 +5,5 @@ __pycache__
 
 data/deviantart/images
 data/wikiart/images
+
+models/
