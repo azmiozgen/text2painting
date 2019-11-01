@@ -1,12 +1,16 @@
 ## Convert .csv label format to sentence format (each line is token series with space between) for Word2Vec.
 import os
 import re
-
-SUBSET = 'deviantart'
-LABELS_FILE = os.path.join(SUBSET, 'labels.csv')
-OUTPUT_FILE = os.path.join(SUBSET, 'label_sentences.txt')
+import sys
 
 if __name__ == '__main__':
+
+    if len(sys.argv) != 2:
+       print("Usage python {} <SUBSET>".format(sys.argv[0]))
+       exit()
+    SUBSET = sys.argv[1]
+    LABELS_FILE = os.path.join(SUBSET, 'labels.csv')
+    OUTPUT_FILE = os.path.join(SUBSET, 'label_sentences.txt')
 
     if not os.path.isfile(LABELS_FILE):
         print(LABELS_FILE, 'not found. Exiting')
