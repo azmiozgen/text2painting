@@ -3,6 +3,8 @@ __pycache__
 
 .vscode
 
+*.bak
+
 data/deviantart/images
 data/wikiart/images
 
