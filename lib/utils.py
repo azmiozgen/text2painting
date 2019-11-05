@@ -3,7 +3,7 @@ from io import BytesIO, StringIO
 import torchvision.transforms as transforms
 from PIL import Image
 
-from .preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
+from preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
                          RandomResizedCrop, RandomResolution, RandomRotate)
 
 

@@ -2,85 +2,109 @@ import random
 import sys
 from io import BytesIO
 
-import lmdb
 import numpy as np
 import torch
 from PIL import Image, ImageFilter
 from torch.utils.data import Dataset
 
-from .utils import ImageUtilities
 
+import glob
+import os
 
-class ClsDataset(Dataset):
-    """Dataset Reader"""
+import numpy as np
+import pandas as pd
+from PIL import Image
+import torch
+from torch.utils.data import Dataset
+from torchvision.transforms.functional import normalize, to_tensor
 
-    def __init__(self, _lmdb_path):
+from utils import ImageUtilities
+from preprocess import pad_image, crop_edges_lr
 
-        self._lmdb_path = _lmdb_path
+class TextArtDataLoader(Dataset):
+    def __init__(self, subset_list, mode='train'):
+        val_ratio = 0.1
+        test_ratio = 0.1
+        seed = 73
+        np.random.seed(seed)
+        self.mode = mode
 
-        self.env = lmdb.open(self._lmdb_path, max_readers=1, readonly=True,
-                             lock=False, readahead=False, meminit=False)
+        if not isinstance(subset_list, list):
+            subset_list = [subset_list]
 
-        if not self.env:
-            print('Cannot read lmdb from {}'.format(self._lmdb_path))
-            sys.exit(0)
+        data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
+        label_filename = 'labels.csv'
+        label_sentences_filename = 'label_sentences.txt'
+        images_dirname = 'images'
 
-        with self.env.begin(write=False) as txn:
-            self.n_samples = int(txn.get('num-samples'.encode()))
+        labels_dict = {}
+        for subset in subset_list:
+            subset_dir = os.path.join(data_dir, subset)
+            if not os.path.isdir(subset_dir):
+                print(subset_dir, 'not found.')
+                continue
 
-    def __load_data(self, index):
+            ## Read label_file and get image_filenames
+            label_file = os.path.join(subset_dir, label_filename)
+            with open(label_file, 'r') as f:
+                lines = f.readlines()
+            label_lines = list(map(lambda s:s.strip(), lines))
 
-        with self.env.begin(write=False) as txn:
-            image_key = 'image-%09d' %(index + 1)
-            label_key = 'label-%09d' %(index + 1)
+            ## Read label_sentences file
+            label_sentences_file = os.path.join(subset_dir, label_sentences_filename)
+            with open(label_sentences_file, 'r') as f:
+                lines = f.readlines()
+            label_sentence_lines = list(map(lambda s:s.strip(), lines))
 
-            label = txn.get(label_key.encode())
-            label = label.decode()
+            assert(len(label_lines) == len(label_sentence_lines))
 
-            img = txn.get(image_key.encode())
-            img = Image.open(BytesIO(img)).convert('RGB')
+            ## Make image_file-sentence pairs
+            for label_line, label_sentence_line in zip(label_lines, label_sentence_lines):
+                image_filename = label_line.split(',')[0]
+                image_file = os.path.join(subset_dir, images_dirname, image_filename)
+                if os.path.isfile(image_file):
+                    labels_dict[image_file] = label_sentence_line.split()
 
-        return img, label
+        ## Set subdata(train-test-val) size
+        n_image_files = len(labels_dict)
+        if self.mode == 'train':
+            self.size = int(n_image_files * (1 - (val_ratio + test_ratio)))
+        elif self.mode == 'test':
+            self.size = int(n_image_files * test_ratio)
+        elif self.mode == 'val':
+            self.size = int(n_image_files * val_ratio)
+
+        ## Set subdata(train-test-val)
+        subkeys = np.random.choice(list(labels_dict.keys()), self.size)
+        self.labels_dict = {k : labels_dict[k] for k in subkeys}
+
+        ## Set image files list
+        self.image_files = list(self.labels_dict.keys())
+
+    def preprocess(self, img):
+        img_tensor = to_tensor(img)
+        img_tensor = normalize(img_tensor,  mean=[el.mean() for el in img_tensor] ,std=[el.std() for el in img_tensor])
+        return img_tensor
+
+    def load(self, image_file):
+        img = Image.open(image_file)
+        img.load()
+        return img
 
     def __getitem__(self, index):
+        image_file = self.image_files[index]
 
-        assert index <= len(self), 'index range error'
+        # Load image
+        img = self.load(image_file)
+        img = self.preprocess(img)
 
-        image, label = self.__load_data(index)
-
-        return image, label
+        ## Get label sentence
+        label_sentence = self.labels_dict[image_file]
+        return img, label_sentence, image_file
 
     def __len__(self):
-        return self.n_samples
+        return self.size
 
-def pad_image(img):
-
-    w, h = img.size
-
-    pad_h = int(np.random.rand() * h / 2.0) + 1
-    pad_w = int(np.random.rand() * w / 2.0) + 1
-
-    new_size = (w + pad_w, h + pad_h)
-    offset = (np.random.randint(pad_w), np.random.randint(pad_h))
-
-    bg_colors =tuple( np.random.randint(256, size=3).astype(np.uint8))
-
-    bg = Image.new("RGB", new_size, bg_colors)
-    bg.paste(img, offset)
-
-    return bg
-
-def crop_edges_lr(img):
-
-    w, h = img.size
-
-    crop_l = int(np.random.rand() * w / 4.0) + 1
-    crop_r = int(np.random.rand() * w / 4.0) + 1
-
-    img = np.array(img)
-    img = img[:, crop_l:-crop_r]
-    img = Image.fromarray(img)
-    return img
 
 class AlignCollate(object):
     """Should be a callable (https://docs.python.org/2/library/functions.html#callable), that gets a minibatch
@@ -195,3 +219,10 @@ class AlignCollate(object):
         labels = torch.LongTensor(np.array(labels))
 
         return images, labels
+
+if __name__ == "__main__":
+    
+    ## Test TextArtDataLoader
+    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], mode='train')
+    print("Size:", len(train_dataset))
+    print(train_dataset[0])
