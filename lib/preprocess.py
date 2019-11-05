@@ -11,12 +11,14 @@ except ImportError:
     accimage = None
 
 def _is_pil_image(img):
+
     if accimage is not None:
         return isinstance(img, (Image.Image, accimage.Image))
     else:
         return isinstance(img, Image.Image)
 
 def pad_image(img):
+
     w, h = img.size
 
     pad_h = int(np.random.rand() * h / 2.0) + 1
@@ -33,6 +35,7 @@ def pad_image(img):
     return bg
 
 def crop_edges_lr(img):
+
     w, _ = img.size
 
     crop_l = int(np.random.rand() * w / 4.0) + 1
@@ -44,12 +47,14 @@ def crop_edges_lr(img):
     return img
 
 def crop(img, i, j, h, w):
+
     if not _is_pil_image(img):
         raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
 
     return img.crop((j, i, j + w, i + h))
 
 def resize(img, size, interpolation=Image.BILINEAR):
+
     if not _is_pil_image(img):
         raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
     if not (isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)):
@@ -71,6 +76,7 @@ def resize(img, size, interpolation=Image.BILINEAR):
         return img.resize(size[::-1], interpolation)
 
 def resized_crop(img, i, j, h, w, size, interpolation=Image.BILINEAR):
+
     assert _is_pil_image(img), 'img should be PIL Image'
     img = crop(img, i, j, h, w)
     img = resize(img, size, interpolation)

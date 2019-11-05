@@ -7,7 +7,6 @@ import torch
 from PIL import Image, ImageFilter
 from torch.utils.data import Dataset
 
-
 import glob
 import os
 
@@ -18,8 +17,8 @@ import torch
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import normalize, to_tensor
 
-from utils import ImageUtilities
-from preprocess import pad_image, crop_edges_lr
+from .utils import ImageUtilities
+from .preprocess import pad_image, crop_edges_lr
 
 class TextArtDataLoader(Dataset):
     def __init__(self, subset_list, mode='train'):
@@ -110,19 +109,23 @@ class AlignCollate(object):
     """Should be a callable (https://docs.python.org/2/library/functions.html#callable), that gets a minibatch
     and returns minibatch."""
 
-    def __init__(self, mode, labels, mean, std,
-                 image_size_height, image_size_width,
-                 horizontal_flipping=True, random_rotation=True,
-                 color_jittering=True, random_grayscale=True,
-                 random_channel_swapping=True, random_gamma=True,
-                 random_resolution=True):
+    def __init__(self, mode,
+                       mean,
+                       std,
+                       image_size_height,
+                       image_size_width,
+                       horizontal_flipping=True,
+                       random_rotation=True,
+                       color_jittering=True,
+                       random_grayscale=True,
+                       random_channel_swapping=True,
+                       random_gamma=True,
+                       random_resolution=True):
 
         self._mode = mode
 
-        assert self._mode in ['training', 'test']
+        assert self._mode in ['train', 'test']
 
-        self.label_mapping = labels
-        self.n_classes = len(self.label_mapping)
         self.mean = mean
         self.std = std
         self.image_size_height = image_size_height
@@ -136,7 +139,7 @@ class AlignCollate(object):
         self.random_gamma = random_gamma
         self.random_resolution = random_resolution
 
-        if self._mode == 'training':
+        if self._mode == 'train':
             if self.random_resolution:
                 self.random_res = ImageUtilities.image_random_resolution([0.7, 1.3])
 
@@ -161,9 +164,9 @@ class AlignCollate(object):
         self.resizer = ImageUtilities.image_resizer(self.image_size_height, self.image_size_width)
         self.normalizer = ImageUtilities.image_normalizer(self.mean, self.std)
 
-    def __preprocess(self, image, label):
+    def __preprocess(self, image):
 
-        if self._mode == 'training':
+        if self._mode == 'train':
 
             image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 2.0))
             if np.random.rand() < 0.5:
@@ -200,9 +203,7 @@ class AlignCollate(object):
         image = self.resizer(image)
         image = self.normalizer(image)
 
-        label = np.where(self.label_mapping == label)[0][0]
-
-        return image, label
+        return image
 
     def __call__(self, batch):
         images, labels = list(zip(*batch))
@@ -211,9 +212,7 @@ class AlignCollate(object):
 
         bs = len(images)
         for i in range(bs):
-            image, label = self.__preprocess(images[i], labels[i])
-            images[i] = image
-            labels[i] = label
+            images[i] = self.__preprocess(images[i])
 
         images = torch.stack(images)
         labels = torch.LongTensor(np.array(labels))
