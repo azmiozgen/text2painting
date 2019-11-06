@@ -19,9 +19,9 @@ class Config():
         self.IMAGE_SIZE_HEIGHT = 72 #~(width * 0.29)
 
         self.HORIZONTAL_FLIPPING = False
-        self.RANDOM_ROTATION = True
+        self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
         self.RANDOM_CHANNEL_SWAPPING = True
-        self.RANDOM_GAMMA = True
-        self.RANDOM_GRAYSCALE = True
-        self.RANDOM_RESOLUTION = True
+        self.RANDOM_GAMMA = False
+        self.RANDOM_GRAYSCALE = False
+        self.RANDOM_RESOLUTION = False

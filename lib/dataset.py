@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 import glob
 import os
 
+from gensim.models import Word2Vec
 import numpy as np
 import pandas as pd
 from PIL import Image
@@ -21,12 +22,15 @@ from .utils import ImageUtilities
 from .preprocess import pad_image, crop_edges_lr
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, subset_list, mode='train'):
+    def __init__(self, subset_list, word2vec_model_file, mode='train'):
         val_ratio = 0.1
         test_ratio = 0.1
         seed = 73
         np.random.seed(seed)
         self.mode = mode
+
+        ## Load Word2Vec model
+        self.word2vec_model = Word2Vec.load(word2vec_model_file)
 
         if not isinstance(subset_list, list):
             subset_list = [subset_list]
@@ -74,19 +78,25 @@ class TextArtDataLoader(Dataset):
             self.size = int(n_image_files * val_ratio)
 
         ## Set subdata(train-test-val)
-        subkeys = np.random.choice(list(labels_dict.keys()), self.size)
+        subkeys = np.random.choice(list(labels_dict.keys()), self.size, replace=False)
         self.labels_dict = {k : labels_dict[k] for k in subkeys}
 
         ## Set image files list
         self.image_files = list(self.labels_dict.keys())
 
-    def preprocess(self, img):
-        img_tensor = to_tensor(img)
-        img_tensor = normalize(img_tensor,  mean=[el.mean() for el in img_tensor] ,std=[el.std() for el in img_tensor])
-        return img_tensor
+    def get_word_vector(self, word):
+        if self.word2vec_model.wv.vocab.get(word):
+            return self.word2vec_model[word]
+        else:
+            return None
+
+    # def preprocess(self, img):
+    #     img_tensor = to_tensor(img)
+    #     # img_tensor = normalize(img_tensor, mean=[el.mean() for el in img_tensor], std=[el.std() for el in img_tensor])
+    #     return img_tensor
 
     def load(self, image_file):
-        img = Image.open(image_file)
+        img = Image.open(image_file).convert('RGB')
         img.load()
         return img
 
@@ -95,11 +105,18 @@ class TextArtDataLoader(Dataset):
 
         # Load image
         img = self.load(image_file)
-        img = self.preprocess(img)
+        # img = self.preprocess(img)
 
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]
-        return img, label_sentence, image_file
+        word_vectors = []
+        for word in label_sentence:
+            vector = self.get_word_vector(word)
+            if vector is not None:
+                word_vectors.append(vector)
+        word_vectors = torch.Tensor(word_vectors)
+
+        return img, word_vectors
 
     def __len__(self):
         return self.size
@@ -123,7 +140,6 @@ class AlignCollate(object):
                        random_resolution=True):
 
         self._mode = mode
-
         assert self._mode in ['train', 'test']
 
         self.mean = mean
@@ -206,22 +222,34 @@ class AlignCollate(object):
         return image
 
     def __call__(self, batch):
-        images, labels = list(zip(*batch))
-        images = list(images)
-        labels = list(labels)
+        images = []
+        word_vectors_list = []
+        max_sentence_length = 0
+        for item in batch:
+            img = item[0]
+            word_vectors = item[1]
+            images.append(self.__preprocess(img))
+            word_vectors_list.append(word_vectors)
 
-        bs = len(images)
-        for i in range(bs):
-            images[i] = self.__preprocess(images[i])
+            ## Find max sentence length
+            if len(word_vectors) > max_sentence_length:
+                max_sentence_length = len(word_vectors)
+
+        ## Equalize in-batch word vector lengths
+        for i, word_vectors in enumerate(word_vectors_list):
+            padded_wv = torch.Tensor(np.pad(word_vectors, ((0, max_sentence_length - len(word_vectors)), (0, 0))))
+            word_vectors_list[i] = padded_wv
 
         images = torch.stack(images)
-        labels = torch.LongTensor(np.array(labels))
+        word_vectors_tensor = torch.stack(word_vectors_list)
 
-        return images, labels
+        return images, word_vectors_tensor
 
 if __name__ == "__main__":
+
+    WORD2VEC_MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', 'deviant_wiki_word2vec.model'))
     
     ## Test TextArtDataLoader
-    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], mode='train')
+    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], word2vec_model_file=WORD2VEC_MODEL_FILE, mode='train')
     print("Size:", len(train_dataset))
     print(train_dataset[0])
