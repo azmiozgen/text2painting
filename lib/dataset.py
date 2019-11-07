@@ -1,87 +1,55 @@
+import glob
+import os
 import random
 import sys
 from io import BytesIO
 
 import numpy as np
-import torch
 from PIL import Image, ImageFilter
-from torch.utils.data import Dataset
 
-import glob
-import os
-
-from gensim.models import Word2Vec
-import numpy as np
 import pandas as pd
-from PIL import Image
 import torch
+from gensim.models import Word2Vec
 from torch.utils.data import Dataset
 from torchvision.transforms.functional import normalize, to_tensor
 
+from .preprocess import crop_edges_lr, pad_image
 from .utils import ImageUtilities
-from .preprocess import pad_image, crop_edges_lr
+
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, subset_list, word2vec_model_file, mode='train'):
-        val_ratio = 0.1
-        test_ratio = 0.1
-        seed = 73
-        np.random.seed(seed)
+    def __init__(self, subset, word2vec_model_file, mode='train'):
+
         self.mode = mode
 
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(word2vec_model_file)
 
-        if not isinstance(subset_list, list):
-            subset_list = [subset_list]
-
         data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
-        label_filename = 'labels.csv'
-        label_sentences_filename = 'label_sentences.txt'
-        images_dirname = 'images'
+        subset_dir = os.path.join(data_dir, subset)
+        label_filename = '{}_labels.csv'.format(self.mode)
+        label_file = os.path.join(subset_dir, label_filename)
 
-        labels_dict = {}
-        for subset in subset_list:
-            subset_dir = os.path.join(data_dir, subset)
-            if not os.path.isdir(subset_dir):
-                print(subset_dir, 'not found.')
-                continue
+        if not os.path.isfile(label_file):
+            print(label_file, "not found. Exiting.")
+            exit()
 
-            ## Read label_file and get image_filenames
-            label_file = os.path.join(subset_dir, label_filename)
-            with open(label_file, 'r') as f:
-                lines = f.readlines()
-            label_lines = list(map(lambda s:s.strip(), lines))
+        ## Read label_file and get image_filenames
+        with open(label_file, 'r') as f:
+            lines = f.readlines()
+        label_lines = list(map(lambda s:s.strip(), lines))
 
-            ## Read label_sentences file
-            label_sentences_file = os.path.join(subset_dir, label_sentences_filename)
-            with open(label_sentences_file, 'r') as f:
-                lines = f.readlines()
-            label_sentence_lines = list(map(lambda s:s.strip(), lines))
+        ## Make image_file-sentence pairs
+        self.labels_dict = {}
+        for label_line in label_lines:
+            image_relative_file = label_line.split(',')[0]
+            image_file = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, image_relative_file))
 
-            assert(len(label_lines) == len(label_sentence_lines))
+            if os.path.isfile(image_file):
+                labels = label_line.split(',')[1:]
+                self.labels_dict[image_file] = labels
 
-            ## Make image_file-sentence pairs
-            for label_line, label_sentence_line in zip(label_lines, label_sentence_lines):
-                image_filename = label_line.split(',')[0]
-                image_file = os.path.join(subset_dir, images_dirname, image_filename)
-                if os.path.isfile(image_file):
-                    labels_dict[image_file] = label_sentence_line.split()
-
-        ## Set subdata(train-test-val) size
-        n_image_files = len(labels_dict)
-        if self.mode == 'train':
-            self.size = int(n_image_files * (1 - (val_ratio + test_ratio)))
-        elif self.mode == 'test':
-            self.size = int(n_image_files * test_ratio)
-        elif self.mode == 'val':
-            self.size = int(n_image_files * val_ratio)
-
-        ## Set subdata(train-test-val)
-        subkeys = np.random.choice(list(labels_dict.keys()), self.size, replace=False)
-        self.labels_dict = {k : labels_dict[k] for k in subkeys}
-
-        ## Set image files list
+        ## Set all image files list
         self.image_files = list(self.labels_dict.keys())
 
     def get_word_vector(self, word):
@@ -119,7 +87,7 @@ class TextArtDataLoader(Dataset):
         return img, word_vectors
 
     def __len__(self):
-        return self.size
+        return len(self.image_files)
 
 
 class AlignCollate(object):
@@ -140,7 +108,7 @@ class AlignCollate(object):
                        random_resolution=True):
 
         self._mode = mode
-        assert self._mode in ['train', 'test']
+        assert self._mode in ['train', 'val']
 
         self.mean = mean
         self.std = std
