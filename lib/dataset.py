@@ -11,6 +11,7 @@ import pandas as pd
 import torch
 from gensim.models import Word2Vec
 from torch.utils.data import Dataset
+from torch.utils.data.sampler import Sampler
 from torchvision.transforms.functional import normalize, to_tensor
 
 from .preprocess import crop_edges_lr, pad_image
@@ -34,7 +35,7 @@ class TextArtDataLoader(Dataset):
             print(label_file, "not found. Exiting.")
             exit()
 
-        ## Read label_file and get image_filenames
+        ## Read label_file
         with open(label_file, 'r') as f:
             lines = f.readlines()
         label_lines = list(map(lambda s:s.strip(), lines))
@@ -221,3 +222,90 @@ if __name__ == "__main__":
     train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], word2vec_model_file=WORD2VEC_MODEL_FILE, mode='train')
     print("Size:", len(train_dataset))
     print(train_dataset[0])
+
+class ImageBatchSampler(Sampler):
+    '''
+        Group image files by their image sizes # of labels and sample similar from images.
+    '''
+
+    def __init__(self, subset, batch_size, mode='train'):
+
+        if mode == 'train':
+            n_labels_ranges = [-1, 5, 7, 11, 1000]
+            width_ranges = [-1, 500, 700, 1000, 100000]
+            height_ranges = [-1, 590, 100000]
+
+        self.batch_size = batch_size
+
+        data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
+        subset_dir = os.path.join(data_dir, subset)
+        labels_filename = '{}_labels.csv'.format(mode)
+        labels_file = os.path.join(subset_dir, labels_filename)
+        shapes_filename = '{}_image_shapes.csv'.format(mode)
+        shapes_file = os.path.join(subset_dir, shapes_filename)
+
+        ## Read labels file
+        with open(labels_file, 'r') as f:
+            lines = f.readlines()
+        label_lines = list(map(lambda s:s.strip(), lines))
+
+        ## Read shapes file
+        shape_lines = np.loadtxt(shapes_file, delimiter=',', dtype=str)
+
+        ## Create image_file, n_labels df
+        image_n_labels = []
+        for label_line in label_lines:
+            image_relative_file = label_line.split(',')[0]
+            labels = label_line.split(',')[1:]
+            n_labels = len(labels)
+            image_n_labels.append([image_relative_file, n_labels])
+        image_n_labels = np.array(image_n_labels)
+        df_image_n_labels = pd.DataFrame(image_n_labels, columns=['image_file', 'n_labels'])
+
+        ## Create image_file, shapes df
+        df_image_shapes = pd.DataFrame(shape_lines, columns=['image_file', 'width', 'height'])
+
+        ## Merge two df on image files
+        self.df = pd.merge(df_image_shapes, df_image_n_labels, on='image_file')
+        self.df = self.df.astype({'image_file': str, 'width': int, 'height': int, 'n_labels': int})
+        self.df['index'] = self.df.index
+
+        ## Group batches
+        self.groups = []
+        df_n_labels_grouped = self.df.groupby(by=pd.cut(self.df['n_labels'], n_labels_ranges))
+
+        ## Group by labels
+        for key1, _ in df_n_labels_grouped:
+            df1 = df_n_labels_grouped.get_group(key1)
+            df_width_grouped = df1.groupby(by=pd.cut(df1['width'], width_ranges))
+
+            ## Group by widths
+            for key2, _ in df_width_grouped:
+                df2 = df_width_grouped.get_group(key2)
+                df_height_grouped = df2.groupby(by=pd.cut(df2['height'], height_ranges))
+
+                ## Group by heights
+                for key3, _ in df_height_grouped:
+                    group_df = df_height_grouped.get_group(key3)
+                    self.groups.append(group_df)
+
+    def __iter__(self):
+        n_batches = len(self.df.index) // self.batch_size
+        group_index = 0
+        while n_batches > 0:
+            group = np.array(self.groups[group_index])
+            batch = []
+            for sample in group:
+                sample_index = sample[-1]    ## Index is last column in df
+                batch.append(sample_index)
+                if len(batch) == self.batch_size:
+                    yield batch
+                    n_batches -= 1
+                    batch = []
+                    continue
+            yield batch
+            n_batches -= 1
+            group_index += 1
+
+    def __len__(self):
+        return len(self.df.index)

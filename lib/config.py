@@ -11,16 +11,14 @@ class Config():
         self.DATA_PATH = os.path.abspath(os.path.join(self.BASE_PATH, 'data'))
 
         ## TODO
-        # self.MEAN = [0.73, 0.74, 0.55]
-        # self.STD = [0.01, 0.02, 0.02]
-        self.MEAN = [0.5, 0.5, 0.5]
-        self.STD = [0.5, 0.5, 0.5]
+        self.MEAN = [0.7402, 0.5459, 0.3712]
+        self.STD = [0.0134, 0.0180, 0.0185]
+        # self.MEAN = [0.5, 0.5, 0.5]
+        # self.STD = [0.5, 0.5, 0.5
 
         ## TODO
-        # self.IMAGE_SIZE_WIDTH = 665
-        # self.IMAGE_SIZE_HEIGHT = 653
-        self.IMAGE_SIZE_WIDTH = 128
-        self.IMAGE_SIZE_HEIGHT = 72
+        self.IMAGE_SIZE_WIDTH = 256
+        self.IMAGE_SIZE_HEIGHT = 196
 
         self.HORIZONTAL_FLIPPING = False
         self.RANDOM_ROTATION = False

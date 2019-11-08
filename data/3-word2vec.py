@@ -121,31 +121,26 @@ class Word2VecModelGenerator():
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2:
-        print("Usage: python {} <subset_dir>".format(sys.argv[0]))
+    if len(sys.argv) != 3:
+        print("Usage: python {} <labels_file> <model_name>".format(sys.argv[0]))
         exit()
-    SUBSET = sys.argv[1]
+    LABELS_FILE = sys.argv[1]
+    MODEL_NAME = sys.argv[2]
 
-    if not os.path.isdir(SUBSET):
-        print(SUBSET, "not found. Exiting")
+    if not os.path.isfile(LABELS_FILE):
+        print(LABELS_FILE, "not found. Exiting")
         exit()
 
-    ## Parameters
-    LABEL_SENTENCES_FILENAME = 'train_label_sentences.txt'
-    LABEL_SENTENCES_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data', SUBSET, LABEL_SENTENCES_FILENAME))
-    TOP_N = 20
-
-    ## Check label sentences file
-    if not os.path.isfile(LABEL_SENTENCES_FILE):
-        print(LABEL_SENTENCES_FILE, 'not found. Exiting')
-        exit()
-    else:
-        print("Processing {}".format(LABEL_SENTENCES_FILE))
-
-    ## Read label sentences file
-    with open(LABEL_SENTENCES_FILE, 'r') as f:
+    ## Read labels file
+    with open(LABELS_FILE, 'r') as f:
         lines = f.readlines()
-    label_sentences = list(map(lambda s: s.strip(), lines))
+    lines = list(map(lambda s: s.strip(), lines))
+
+    label_sentences = []
+    for line in lines:
+        labels = line.split(',')[1:]
+        label_sentence = ' '.join(labels)
+        label_sentences.append(label_sentence)
 
     ## Get stemmed and lemmatized label corpus
     print("Stemming and lemmatizing..")
@@ -154,13 +149,14 @@ if __name__ == "__main__":
 
     ## Init Word2Vec model
     print("Initializing Word2Vec model..")
-    word2vec_master = Word2VecModelGenerator(label_corpus, SUBSET)
+    word2vec_master = Word2VecModelGenerator(label_corpus, MODEL_NAME)
 
     ## Train model
     print("Training model..")
     word2vec_master.train()
 
     # ## Quick-test model
+    # TOP_N = 20
     # keywords = ['dog', 'cat', 'female', 'male']
     # for keyword in keywords:
     #     similar_words = word2vec_master.get_similar_words(keyword, topN=TOP_N)
