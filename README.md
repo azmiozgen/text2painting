@@ -2,4 +2,5 @@
 
 ## Convert text into beautiful artistic painting
 
-`python -m spacy download en `
+`python -m spacy download en`
+
