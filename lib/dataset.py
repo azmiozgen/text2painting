@@ -70,6 +70,7 @@ class TextArtDataLoader(Dataset):
         return img
 
     def __getitem__(self, index):
+        print("INDEX:", index)
         image_file = self.image_files[index]
 
         # Load image
@@ -79,11 +80,17 @@ class TextArtDataLoader(Dataset):
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]
         word_vectors = []
+        print("LABEL SENTENCE:", label_sentence)
         for word in label_sentence:
             vector = self.get_word_vector(word)
             if vector is not None:
                 word_vectors.append(vector)
-        word_vectors = torch.Tensor(word_vectors)
+
+        ## If empty, make zero vector
+        if len(word_vectors) == 0:
+            word_vectors = torch.zeros(1, self.word2vec_model.vector_size)
+        else:
+            word_vectors = torch.Tensor(word_vectors)
 
         return img, word_vectors
 
@@ -214,14 +221,6 @@ class AlignCollate(object):
 
         return images, word_vectors_tensor
 
-if __name__ == "__main__":
-
-    WORD2VEC_MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', 'deviant_wiki_word2vec.model'))
-    
-    ## Test TextArtDataLoader
-    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], word2vec_model_file=WORD2VEC_MODEL_FILE, mode='train')
-    print("Size:", len(train_dataset))
-    print(train_dataset[0])
 
 class ImageBatchSampler(Sampler):
     '''
@@ -289,23 +288,44 @@ class ImageBatchSampler(Sampler):
                     group_df = df_height_grouped.get_group(key3)
                     self.groups.append(group_df)
 
-    def __iter__(self):
+    def _group_batches(self):
+        sample_indexes = []
         n_batches = len(self.df.index) // self.batch_size
         group_index = 0
         while n_batches > 0:
+            ## If lasts are dropped groups may end
+            if group_index == len(self.groups):
+                break
             group = np.array(self.groups[group_index])
             batch = []
             for sample in group:
                 sample_index = sample[-1]    ## Index is last column in df
                 batch.append(sample_index)
                 if len(batch) == self.batch_size:
-                    yield batch
+                    sample_indexes.extend(batch)
                     n_batches -= 1
                     batch = []
                     continue
-            yield batch
-            n_batches -= 1
             group_index += 1
+            ## Uncomment not to drop lasts
+            # if batch != []:
+            #     sample_indexes.extend(batch)
+            #     n_batches -= 1
+            #     group_index += 1
+        return sample_indexes
+
+    def __iter__(self):
+        grouped_indexes = self._group_batches()
+        return iter(grouped_indexes)
 
     def __len__(self):
         return len(self.df.index)
+
+if __name__ == "__main__":
+
+    WORD2VEC_MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', 'deviant_wiki_word2vec.model'))
+    
+    ## Test TextArtDataLoader
+    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], word2vec_model_file=WORD2VEC_MODEL_FILE, mode='train')
+    print("Size:", len(train_dataset))
+    print(train_dataset[0])
