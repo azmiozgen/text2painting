@@ -55,7 +55,7 @@ class TextArtDataLoader(Dataset):
 
     def get_word_vector(self, word):
         if self.word2vec_model.wv.vocab.get(word):
-            return self.word2vec_model[word]
+            return self.word2vec_model.wv[word]
         else:
             return None
 
@@ -70,7 +70,6 @@ class TextArtDataLoader(Dataset):
         return img
 
     def __getitem__(self, index):
-        print("INDEX:", index)
         image_file = self.image_files[index]
 
         # Load image
@@ -80,7 +79,7 @@ class TextArtDataLoader(Dataset):
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]
         word_vectors = []
-        print("LABEL SENTENCE:", label_sentence)
+
         for word in label_sentence:
             vector = self.get_word_vector(word)
             if vector is not None:
@@ -103,20 +102,26 @@ class AlignCollate(object):
     and returns minibatch."""
 
     def __init__(self, mode,
+                       word2vec_model_file,
                        mean,
                        std,
                        image_size_height,
                        image_size_width,
-                       horizontal_flipping=True,
-                       random_rotation=True,
-                       color_jittering=True,
-                       random_grayscale=True,
-                       random_channel_swapping=True,
-                       random_gamma=True,
-                       random_resolution=True):
+                       horizontal_flipping=False,
+                       random_rotation=False,
+                       color_jittering=False,
+                       random_grayscale=False,
+                       random_channel_swapping=False,
+                       random_gamma=False,
+                       random_resolution=False,
+                       word_padding_similars_topN=10):
 
         self._mode = mode
         assert self._mode in ['train', 'val']
+
+        ## Load Word2Vec model
+        self.word2vec_model = Word2Vec.load(word2vec_model_file)
+        self.word_padding_similars_topN = word_padding_similars_topN
 
         self.mean = mean
         self.std = std
@@ -160,10 +165,12 @@ class AlignCollate(object):
 
         if self._mode == 'train':
 
-            image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 2.0))
-            if np.random.rand() < 0.5:
+            image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
+
+            ## Pad or crop_lr image with low prob.
+            if np.random.rand() < 0.05:
                 image = pad_image(image)
-            else:
+            elif np.random.rand() < 0.1:
                 image = crop_edges_lr(image)
 
             if self.random_resolution:
@@ -193,9 +200,39 @@ class AlignCollate(object):
                 image = self.grayscaler(image)
 
         image = self.resizer(image)
-        image = self.normalizer(image)
+        image = to_tensor(image)
+        # image = self.normalizer(image)
 
         return image
+
+    def _get_word_vector(self, word):
+        if self.word2vec_model.wv.vocab.get(word):
+            return self.word2vec_model.wv[word]
+        else:
+            return None
+
+    def _get_similar_wv_by_vector(self, word_vector):
+        word_vector = np.array(word_vector)
+        _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, topn=self.word_padding_similars_topN)
+        top_similar_words = np.array(_top_similar_words)
+        try:
+            similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
+        except ValueError:
+            similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=True)[0]
+
+        return self._get_word_vector(similar_word)
+
+    def _pad_wvs_with_similar_wvs(self, word_vectors, pad_length):
+        '''
+        Equalize in-batch word vector lengths with random similar words
+        '''
+        final_length = len(word_vectors) + pad_length
+        while len(word_vectors) < final_length:
+            word_vector = random.choice(word_vectors)
+            similar_vector = torch.Tensor(self._get_similar_wv_by_vector(word_vector)).unsqueeze(0)
+            word_vectors = torch.cat((word_vectors, similar_vector))
+
+        return word_vectors
 
     def __call__(self, batch):
         images = []
@@ -211,10 +248,9 @@ class AlignCollate(object):
             if len(word_vectors) > max_sentence_length:
                 max_sentence_length = len(word_vectors)
 
-        ## Equalize in-batch word vector lengths
         for i, word_vectors in enumerate(word_vectors_list):
-            padded_wv = torch.Tensor(np.pad(word_vectors, ((0, max_sentence_length - len(word_vectors)), (0, 0))))
-            word_vectors_list[i] = padded_wv
+            pad_length = max_sentence_length - len(word_vectors)
+            word_vectors_list[i] = self._pad_wvs_with_similar_wvs(word_vectors, pad_length)
 
         images = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
@@ -227,14 +263,16 @@ class ImageBatchSampler(Sampler):
         Group image files by their image sizes # of labels and sample similar from images.
     '''
 
-    def __init__(self, subset, batch_size, mode='train'):
+    def __init__(self, subset, batch_size, shuffle_groups=True, mode='train'):
 
-        if mode == 'train':
-            n_labels_ranges = [-1, 5, 7, 11, 1000]
-            width_ranges = [-1, 500, 700, 1000, 100000]
-            height_ranges = [-1, 590, 100000]
 
         self.batch_size = batch_size
+        self.shuffle_groups = shuffle_groups
+
+        ## Grouping ranges
+        n_labels_ranges = [-1, 5, 7, 11, 1000]
+        width_ranges = [-1, 500, 700, 1000, 100000]
+        height_ranges = [-1, 590, 100000]
 
         data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
         subset_dir = os.path.join(data_dir, subset)
@@ -297,6 +335,8 @@ class ImageBatchSampler(Sampler):
             if group_index == len(self.groups):
                 break
             group = np.array(self.groups[group_index])
+            if self.shuffle_groups:
+                np.random.shuffle(group)
             batch = []
             for sample in group:
                 sample_index = sample[-1]    ## Index is last column in df

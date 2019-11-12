@@ -39,7 +39,7 @@ class Word2VecModelGenerator():
         ## Parameters
         MIN_COUNT = 5       ## Ignores all words with total frequency lower than this.
         WINDOW = 20         ## Maximum distance between the current and predicted word within a sentence.
-        SIZE = 2000         ## Dimensionality of the word vectors.
+        SIZE = 2000         ## Dimensionality of the word vectors. ## TODO
         SAMPLE = 1e-4       ## The threshold for configuring which higher-frequency words are randomly downsampled. EFFECTIVE!
         ALPHA = 1e-2        ## Initial learning rate
         MIN_ALPHA = 1e-5    ## Minimum learning rate

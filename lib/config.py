@@ -8,13 +8,12 @@ class Config():
     def __init__(self):
 
         self.BASE_PATH = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        self.DATA_PATH = os.path.abspath(os.path.join(self.BASE_PATH, 'data'))
+        self.DATA_PATH = os.path.join(self.BASE_PATH, 'data')
+        self.MODEL_PATH = os.path.join(self.BASE_PATH, 'models')
+        self.WORD2VEC_MODEL_FILE = os.path.join(self.MODEL_PATH, 'united_word2vec.model')
 
-        ## TODO
         self.MEAN = [0.7402, 0.5459, 0.3712]
         self.STD = [0.0134, 0.0180, 0.0185]
-        # self.MEAN = [0.5, 0.5, 0.5]
-        # self.STD = [0.5, 0.5, 0.5
 
         ## TODO
         self.IMAGE_SIZE_WIDTH = 256
@@ -27,3 +26,5 @@ class Config():
         self.RANDOM_GAMMA = False
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = False
+
+        self.WORD_PADDING_SIMILARS_TOPN = 20
