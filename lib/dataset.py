@@ -2,6 +2,7 @@ import glob
 import os
 import random
 import sys
+import time
 from io import BytesIO
 
 import numpy as np
@@ -65,25 +66,30 @@ class TextArtDataLoader(Dataset):
     #     return img_tensor
 
     def load(self, image_file):
-        img = Image.open(image_file).convert('RGB')
-        img.load()
+        img = Image.open(image_file)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
         return img
 
     def __getitem__(self, index):
         image_file = self.image_files[index]
 
+        #####start = time.time()
         # Load image
         img = self.load(image_file)
         # img = self.preprocess(img)
+        #####print("Image load: {:.4f}".format(time.time() - start))
 
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]
         word_vectors = []
 
+        #####start = time.time()
         for word in label_sentence:
             vector = self.get_word_vector(word)
             if vector is not None:
                 word_vectors.append(vector)
+        #####print("Get word vector: {:.4f}".format(time.time() - start))
 
         ## If empty, make zero vector
         if len(word_vectors) == 0:
@@ -114,14 +120,16 @@ class AlignCollate(object):
                        random_channel_swapping=False,
                        random_gamma=False,
                        random_resolution=False,
-                       word_padding_similars_topN=10):
+                       word_vectors_similar_pad=True,
+                       word_vectors_similar_pad_topN=10):
 
         self._mode = mode
         assert self._mode in ['train', 'val']
 
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(word2vec_model_file)
-        self.word_padding_similars_topN = word_padding_similars_topN
+        self.word_vectors_similar_pad = word_vectors_similar_pad
+        self.word_vectors_similar_pad_topN = word_vectors_similar_pad_topN
 
         self.mean = mean
         self.std = std
@@ -201,7 +209,7 @@ class AlignCollate(object):
 
         image = self.resizer(image)
         image = to_tensor(image)
-        # image = self.normalizer(image)
+        #image = self.normalizer(image)
 
         return image
 
@@ -213,7 +221,7 @@ class AlignCollate(object):
 
     def _get_similar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
-        _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, topn=self.word_padding_similars_topN)
+        _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, topn=self.word_vectors_similar_pad_topN)
         top_similar_words = np.array(_top_similar_words)
         try:
             similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
@@ -233,6 +241,16 @@ class AlignCollate(object):
             word_vectors = torch.cat((word_vectors, similar_vector))
 
         return word_vectors
+    
+    def _pad_wvs_with_noise(self, word_vectors, pad_length):
+        '''
+        Equalize in-batch word vector lengths with random noise 
+        '''
+        padding_tensor = torch.rand(pad_length, word_vectors.size()[1]) * 2 - 1   ## [-1, 1]
+        word_vectors = torch.cat((word_vectors, padding_tensor))
+
+        return word_vectors
+
 
     def __call__(self, batch):
         images = []
@@ -250,7 +268,10 @@ class AlignCollate(object):
 
         for i, word_vectors in enumerate(word_vectors_list):
             pad_length = max_sentence_length - len(word_vectors)
-            word_vectors_list[i] = self._pad_wvs_with_similar_wvs(word_vectors, pad_length)
+            if self.word_vectors_similar_pad:
+                word_vectors_list[i] = self._pad_wvs_with_similar_wvs(word_vectors, pad_length)
+            else:
+                word_vectors_list[i] = self._pad_wvs_with_noise(word_vectors, pad_length)
 
         images = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
@@ -355,8 +376,8 @@ class ImageBatchSampler(Sampler):
         return sample_indexes
 
     def __iter__(self):
-        grouped_indexes = self._group_batches()
-        return iter(grouped_indexes)
+        self.grouped_indexes = self._group_batches()
+        return iter(self.grouped_indexes)
 
     def __len__(self):
         return len(self.df.index)

@@ -16,8 +16,8 @@ class Config():
         self.STD = [0.0134, 0.0180, 0.0185]
 
         ## TODO
-        self.IMAGE_SIZE_WIDTH = 256
-        self.IMAGE_SIZE_HEIGHT = 196
+        self.IMAGE_SIZE_WIDTH = 64
+        self.IMAGE_SIZE_HEIGHT = 64
 
         self.HORIZONTAL_FLIPPING = False
         self.RANDOM_ROTATION = False
@@ -27,4 +27,5 @@ class Config():
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = False
 
-        self.WORD_PADDING_SIMILARS_TOPN = 20
+        self.WORD_VECTORS_SIMILAR_PAD = True
+        self.WORD_VECTORS_SIMILAR_PAD_TOPN = 20
