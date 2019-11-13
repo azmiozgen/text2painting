@@ -2,6 +2,9 @@
 ## and get united filename-tokens format separated by comma for Word2Vec.
 import os
 import re
+import warnings
+
+from PIL import Image
 
 if __name__ == '__main__':
 
@@ -9,6 +12,8 @@ if __name__ == '__main__':
     OUTPUT_DIR = 'united'
     OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'all_labels.csv')
     os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+    warnings.filterwarnings('error')
 
     if os.path.isfile(OUTPUT_FILE):
         print(OUTPUT_FILE, 'exists. Exiting.')
@@ -33,6 +38,15 @@ if __name__ == '__main__':
 
             if not os.path.isfile(image_file):
                 print(image_file, 'not found. Passing.')
+                continue
+
+            ## Check image integrity
+            try:
+                img = Image.open(image_file) 
+                if img.mode != 'RGB': 
+                    img = img.convert('RGB') 
+            except (Exception, Warning) as e:
+                print("Bad image,", image_file, e)
                 continue
 
             ## Normalize tokens

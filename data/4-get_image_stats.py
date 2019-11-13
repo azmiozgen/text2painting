@@ -51,7 +51,7 @@ if __name__ == '__main__':
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
             except OSError as e:
-                print(e)
+                print(image_file, e)
                 sh.write(image_relative_file + ',' + '0' + ',' + '0' + '\n')
                 continue
 
@@ -59,8 +59,8 @@ if __name__ == '__main__':
             try:
                 means.append(ImageStat.Stat(img).mean)
                 stds.append(ImageStat.Stat(img).stddev)
-            except ValueError as e:
-                print(e)
+            except (ValueError, OSError) as e:
+                print(image_file, e)
                 sh.write(image_relative_file + ',' + '0' + ',' + '0' + '\n')
                 continue
 
