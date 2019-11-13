@@ -12,8 +12,8 @@ class Config():
         self.MODEL_PATH = os.path.join(self.BASE_PATH, 'models')
         self.WORD2VEC_MODEL_FILE = os.path.join(self.MODEL_PATH, 'united_word2vec.model')
 
-        self.MEAN = [0.7402, 0.5459, 0.3712]
-        self.STD = [0.0134, 0.0180, 0.0185]
+        self.MEAN = [0.5025, 0.5851, 0.4692]
+        self.STD = [0.0470, 0.0228, 0.0072]
 
         ## TODO
         self.IMAGE_SIZE_WIDTH = 64
@@ -27,5 +27,6 @@ class Config():
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = False
 
+        self.LOAD_WORD_VECTORS = True
         self.WORD_VECTORS_SIMILAR_PAD = True
         self.WORD_VECTORS_SIMILAR_PAD_TOPN = 20

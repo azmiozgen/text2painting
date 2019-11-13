@@ -20,12 +20,21 @@ from .utils import ImageUtilities
 
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, subset, word2vec_model_file, mode='train'):
+    def __init__(self, subset, word2vec_model_file, load_word_vectors=False, mode='train'):
 
+        assert mode in ['train', 'val', 'test']
         self.mode = mode
-
+        
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(word2vec_model_file)
+        
+        ## Load all word vectors (Not recommended if low on memory)
+        if load_word_vectors:
+            self.word_vectors_dict = {}
+            for word, _ in self.word2vec_model.wv.vocab.items():
+                self.word_vectors_dict[word] = self.word2vec_model.wv[word]
+        else:
+            self.word_vectors_dict = None
 
         data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
         subset_dir = os.path.join(data_dir, subset)
@@ -56,7 +65,10 @@ class TextArtDataLoader(Dataset):
 
     def get_word_vector(self, word):
         if self.word2vec_model.wv.vocab.get(word):
-            return self.word2vec_model.wv[word]
+            if self.word_vectors_dict:
+                return self.word_vectors_dict[word]
+            else:
+                return self.word2vec_model.wv[word]
         else:
             return None
 
@@ -85,7 +97,7 @@ class TextArtDataLoader(Dataset):
         word_vectors = []
 
         #####start = time.time()
-        for word in label_sentence:
+        for word in label_sentence: 
             vector = self.get_word_vector(word)
             if vector is not None:
                 word_vectors.append(vector)
@@ -286,6 +298,7 @@ class ImageBatchSampler(Sampler):
 
     def __init__(self, subset, batch_size, shuffle_groups=True, mode='train'):
 
+        assert mode in ['train', 'val', 'test']
 
         self.batch_size = batch_size
         self.shuffle_groups = shuffle_groups
