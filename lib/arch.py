@@ -117,14 +117,14 @@ class Discriminator(nn.Module):
 
 
 class DiscriminatorLogits(nn.Module):
-    def __init__(self, ndf, nef, bcondition=True):
+    def __init__(self, ndf, ngf, bcondition=True):
         super(DiscriminatorLogits, self).__init__()
-        self.df_dim = ndf
-        self.ef_dim = nef
+        self.ndf = ndf
+        self.ngf = ngf
         self.bcondition = bcondition
         if bcondition:
             self.outlogits = nn.Sequential(
-                                          conv3x3(ndf * 8 + nef, ndf * 8),
+                                          conv3x3(ndf * 8 + ngf, ndf * 8),
                                           nn.BatchNorm2d(ndf * 8),
                                           nn.LeakyReLU(0.2, inplace=True),
                                           nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
@@ -139,7 +139,7 @@ class DiscriminatorLogits(nn.Module):
     def forward(self, h_code, c_code=None):
         # conditioning output
         if self.bcondition and c_code is not None:
-            c_code = c_code.view(-1, self.ef_dim, 1, 1)
+            c_code = c_code.view(-1, self.ngf, 1, 1)
             c_code = c_code.repeat(1, 1, 4, 4)
             # state size (ngf+egf) x 4 x 4
             h_c_code = torch.cat((h_code, c_code), 1)
