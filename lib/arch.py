@@ -1,73 +1,245 @@
+
+import torch
 import torch.nn as nn
-import torchvision.models as models
+from torch.nn import init
+import functools
+from torch.optim import lr_scheduler
+
+def conv3x3(in_planes, out_planes, kernel_size=3, stride=1, padding=1, bias=False):
+    return nn.Conv2d(
+                     in_planes,
+                     out_planes,
+                     kernel_size=kernel_size,
+                     stride=stride,
+                     padding=padding,
+                     bias=bias
+                     )
 
 
-class CNN(nn.Module):
+def upsample_block(in_planes, out_planes):
+    # Upsample the spatial size by a factor of 2
+    block = nn.Sequential(
+                         nn.Upsample(scale_factor=2, mode='nearest'),
+                         conv3x3(in_planes, out_planes),
+                         nn.BatchNorm2d(out_planes),
+                         nn.ReLU(True)
+                         )
 
-    def __init__(self, model, pretrained=True):
-        super(CNN, self).__init__()
+    return block
 
-        assert model in ['alexnet', 'resnet18', 'squeezenet', '']
-        self._model = model
+class ResBlock(nn.Module):
+    def __init__(self, n_channels):
+        super(ResBlock, self).__init__()
 
-        if model == 'alexnet':
-            self.model = models.__dict__['alexnet'](pretrained=pretrained)
-            self.model = nn.Sequential(*list(self.model.children())[0])  ## Get conv part
-            self.final_feature_size = 256 * 1 * 7
-        elif model == 'resnet18':
-            self.model = models.__dict__['resnet18'](pretrained=pretrained)
-            self.model = nn.Sequential(*list(self.model.children()))[:-4]
-            self.final_feature_size = 128 * 9 * 24
-        elif model == 'squeezenet':  ## TODO (shape mismatch)
-            self.model = models.__dict__['squeezenet1_1'](pretrained=pretrained)
-            self.model = nn.Sequential(*list(self.model.children()))[:-1]
-            self.final_feature_size = 512 * 4 * 11
-        elif model == '':
-            self.model = nn.Sequential(
-                                nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(16, 16, kernel_size=3, stride=1, padding=1),
-                                nn.ReLU(inplace=True),
-                                nn.MaxPool2d(kernel_size=2, stride=2),
-                                nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1),
-                                nn.ReLU(inplace=True),
-                                nn.MaxPool2d(kernel_size=2, stride=2)
-                         )      
-            self.final_feature_size = 32 * 18 * 64
+        self.block = nn.Sequential(
+                                  conv3x3(n_channels, n_channels),
+                                  nn.BatchNorm2d(n_channels),
+                                  nn.ReLU(True),
+                                  conv3x3(n_channels, n_channels),
+                                  nn.BatchNorm2d(n_channels)
+                                  )
+
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
-        b, n_channel, n_height, n_width = x.size()
-        x = self.model(x)
-        #print(x.size()) ## To decide self.final_feature_size
-        x = x.view(b, self.final_feature_size)
+        residual = x
+        out = self.block(x)
+        out += residual
+        out = self.relu(out)
+        return out
 
-        return x
+class Generator(nn.Module):
+    def __init__(self, config):
+        super(Generator, self).__init__()
 
-class Architecture(nn.Module):
+        ninput = config.N_INPUT
+        ngf = config.NGF * 8
+        self.ninput = ninput
+        self.ngf = ngf
 
-    def __init__(self, model, n_classes, pretrained=True):
-        super(Architecture, self).__init__()
+        # -> ngf x 4 x 4
+        self.fc = nn.Sequential(
+                               nn.Linear(ninput, ngf * 4 * 4, bias=False),
+                               nn.BatchNorm1d(ngf * 4 * 4),
+                               nn.ReLU(True)
+                               )
 
-        self.n_classes = n_classes
+        self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x 4 x 4 -> ngf/2 x 8 x 8
+        self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 16 x 16
+        self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 32 x 32
+        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 64 x 64
 
-        self.cnn = CNN(model, pretrained=pretrained)
-        if model == 'squeezenet':
-            self.classifier = nn.Sequential(
-                                     nn.Dropout(p=0.5),
-                                     nn.Conv2d(self.cnn.final_feature_size, self.n_classes, kernel_size=(1, 1), stride=(1, 1)),
-                                     nn.ReLU(inplace=True),
-                                     nn.AdaptiveAvgPool2d(output_size=(1, 1))
-                              )
+        self.image = nn.Sequential(
+                                  conv3x3(ngf // 16, 3),
+                                  nn.Tanh()
+                                  )                              # -> 3 x 64 x 64
+
+    def forward(self, word_vectors):
+        out = self.fc(word_vectors)
+        out = out.view(-1, self.ngf, 4, 4)
+        out = self.upsample1(out)
+        out = self.upsample2(out)
+        out = self.upsample3(out)
+        out = self.upsample4(out)
+        out = self.image(out)
+
+        return out
+
+class Discriminator(nn.Module):
+    def __init__(self, config):
+        super(Discriminator, self).__init__()
+        ndf = config.NDF
+        ngf = config.NGF
+        self.ndf = ndf
+        self.ngf = ngf
+
+        self.conv = nn.Sequential(                                                        # (3) x H x W
+                                       nn.Conv2d(3, ndf, 4, 2, 1, bias=False),            # (ndf) x H/2 x W/2
+                                       nn.LeakyReLU(0.2, inplace=True),
+                                       nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4
+                                       nn.BatchNorm2d(ndf * 2),
+                                       nn.LeakyReLU(0.2, inplace=True),
+                                       nn.Conv2d(ndf*2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
+                                       nn.BatchNorm2d(ndf * 4),
+                                       nn.LeakyReLU(0.2, inplace=True),
+                                       nn.Conv2d(ndf*4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
+                                       nn.BatchNorm2d(ndf * 8),
+                                       nn.LeakyReLU(0.2, inplace=True)
+        )
+
+        self.get_cond_logits = DiscriminatorLogits(ndf, ngf)
+        self.get_uncond_logits = None
+
+    def forward(self, image):
+        out = self.conv(image)
+
+        return out
+
+
+class DiscriminatorLogits(nn.Module):
+    def __init__(self, ndf, nef, bcondition=True):
+        super(DiscriminatorLogits, self).__init__()
+        self.df_dim = ndf
+        self.ef_dim = nef
+        self.bcondition = bcondition
+        if bcondition:
+            self.outlogits = nn.Sequential(
+                                          conv3x3(ndf * 8 + nef, ndf * 8),
+                                          nn.BatchNorm2d(ndf * 8),
+                                          nn.LeakyReLU(0.2, inplace=True),
+                                          nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
+                                          nn.Sigmoid()
+                                          )
         else:
-            self.classifier = nn.Sequential(
-                                     nn.Dropout(0.5),
-                                     nn.Linear(self.cnn.final_feature_size, self.n_classes)
-                              )
+            self.outlogits = nn.Sequential(
+                                          nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
+                                          nn.Sigmoid()
+                                          )
+
+    def forward(self, h_code, c_code=None):
+        # conditioning output
+        if self.bcondition and c_code is not None:
+            c_code = c_code.view(-1, self.ef_dim, 1, 1)
+            c_code = c_code.repeat(1, 1, 4, 4)
+            # state size (ngf+egf) x 4 x 4
+            h_c_code = torch.cat((h_code, c_code), 1)
+        else:
+            h_c_code = h_code
+
+        output = self.outlogits(h_c_code)
+        return output.view(-1)
+
+class GeneratorAlt1(nn.Module):
+    def __init__(self):
+        super(Generator, self).__init__()
+        
+        self.main = nn.Sequential(                                                                
+            ## 1 x 2000
+            nn.ConvTranspose2d(1 * 2000, 64, kernel_size=4, stride=1, padding=0, bias=False),  
+            ## 64 x 4 x 4
+            nn.BatchNorm2d(64),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1, bias=False),
+            ## 32 x 8 x 8
+            nn.BatchNorm2d(32),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1, bias=False),
+            ## 16 x 16 x 16
+            nn.BatchNorm2d(16),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=1, bias=False),
+            ## 8 x 32 x 32
+            nn.BatchNorm2d(8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(8, 3, kernel_size=4, stride=2, padding=1, bias=False),
+            ## 3 x 64 x 64
+            nn.Tanh()
+        )
 
     def forward(self, x):
-        x = self.cnn(x)
-        x = self.classifier(x)
+        return self.main(x)
 
-        return x
+class DiscriminatorAlt1(torch.nn.Module):
+    def __init__(self):
+        super(Discriminator, self).__init__()
+        self.main = nn.Sequential(                                                ## 3 x H x W
+            nn.Conv2d(3, 16, kernel_size=4, stride=2, padding=1, bias=False),     ## 16 x H/2 x W/2
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, bias=False),    ## 32 x H/4 x W/4
+            nn.BatchNorm2d(32),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=False),    ## 64 x H/8 x W/8
+            nn.BatchNorm2d(64),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=False),   ## 128 x H/16 x W/16
+            nn.BatchNorm2d(128),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(128, 1, kernel_size=4, stride=1, padding=0, bias=False),    ## 1 x H/64 x W/64
+            nn.Sigmoid()
+        )
+
+    def forward(self, input):
+        return self.main(input)
+
+# class Discriminator(nn.Module):
+#     def __init__(self, config):
+#         super(Discriminator, self).__init__()
+
+#         ndf = config.NDF
+#         ngf = config.NGF
+#         self.ndf = ndf
+#         self.ngf = ngf
+
+#         self.conv = nn.Sequential(
+#                                        nn.Conv2d(3, ndf, 4, 2, 1, bias=False),            # 128 * 128 * ndf
+#                                        nn.LeakyReLU(0.2, inplace=True),
+#                                        nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+#                                        nn.BatchNorm2d(ndf * 2),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 64 * 64 * ndf * 2
+#                                        nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+#                                        nn.BatchNorm2d(ndf * 4),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 32 * 32 * ndf * 4
+#                                        nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+#                                        nn.BatchNorm2d(ndf * 8),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 16 * 16 * ndf * 8
+#                                        nn.Conv2d(ndf * 8, ndf * 16, 4, 2, 1, bias=False),
+#                                        nn.BatchNorm2d(ndf * 16),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 8 * 8 * ndf * 16
+#                                        nn.Conv2d(ndf * 16, ndf * 32, 4, 2, 1, bias=False),
+#                                        nn.BatchNorm2d(ndf * 32),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 4 * 4 * ndf * 32
+#                                        conv3x3(ndf * 32, ndf * 16),
+#                                        nn.BatchNorm2d(ndf * 16),
+#                                        nn.LeakyReLU(0.2, inplace=True),                   # 4 * 4 * ndf * 16
+#                                        conv3x3(ndf * 16, ndf * 8),
+#                                        nn.BatchNorm2d(ndf * 8),
+#                                        nn.LeakyReLU(0.2, inplace=True)                    # 4 * 4 * ndf * 8
+#                                        )
+
+#         self.get_cond_logits = DiscriminatorLogits(ndf, ngf, bcondition=True)
+#         self.get_uncond_logits = DiscriminatorLogits(ndf, ngf, bcondition=False)
+
+#     def forward(self, x):
+#         out = self.conv(x)
+
+#         return out
