@@ -1,10 +1,19 @@
 ## Read all_labels.csv and split into train-val-test
 import os
 import random
+import sys
 
 if __name__ == '__main__':
 
-    OUTPUT_DIR = 'united'
+    if len(sys.argv) != 2:
+        print("Usage: python {} <output_dir>".format(sys.argv[0]))
+        exit()
+    OUTPUT_DIR = sys.argv[1]
+
+    if not os.path.isdir(OUTPUT_DIR):
+        print(OUTPUT_DIR, 'not found. Exiting.')
+        exit()
+
     ALL_LABELS_FILE = os.path.join(OUTPUT_DIR, 'all_labels.csv')
     TRAIN_OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'train_labels.csv')
     VAL_OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'val_labels.csv')
