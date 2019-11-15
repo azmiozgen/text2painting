@@ -13,6 +13,7 @@ from gensim.models.phrases import Phrases, Phraser
 import spacy
 
 
+
 class StemmingLemmatization():
 
     def __init__(self, label_sentences):
@@ -31,36 +32,26 @@ class StemmingLemmatization():
 
 class Word2VecModelGenerator():
 
-    def __init__(self, label_corpus, model_output_name):
+    def __init__(self, label_corpus, model_output_name, config):
         '''
             label_corpus : List of label tokens. Passed from stemmer and lemmatizer preferably.
             model_output_name : String 
         '''
-        ## Parameters
-        MIN_COUNT = 5       ## Ignores all words with total frequency lower than this.
-        WINDOW = 20         ## Maximum distance between the current and predicted word within a sentence.
-        SIZE = 2000         ## Dimensionality of the word vectors. ## TODO
-        SAMPLE = 1e-4       ## The threshold for configuring which higher-frequency words are randomly downsampled. EFFECTIVE!
-        ALPHA = 1e-2        ## Initial learning rate
-        MIN_ALPHA = 1e-5    ## Minimum learning rate
-        EPOCHS = 100        ## Training epochs
-        NEGATIVE = 5        ## If > 0, negative sampling will be used, 
-                            ## the int for negative specifies how many “noise words” should be drawn (usually between 5-20). 
-                            ## If set to 0, no negative sampling is used.
-        WORKERS = multiprocessing.cpu_count() - 1
+
         MODEL_OUTPUT_FILENAME = model_output_name + '_word2vec.model'
         MODEL_OUTPUT_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', MODEL_OUTPUT_FILENAME))
+        WORKERS = multiprocessing.cpu_count() - 1
 
         self.label_corpus = label_corpus
-        self.epochs = EPOCHS
+        self.epochs = config.WV_EPOCHS
         self.model_output_file = MODEL_OUTPUT_FILE
-        self.model = Word2Vec(min_count=MIN_COUNT,
-                              window=WINDOW,
-                              size=SIZE,
-                              sample=SAMPLE,
-                              alpha=ALPHA,
-                              min_alpha=MIN_ALPHA,
-                              negative=NEGATIVE,
+        self.model = Word2Vec(min_count=config.WV_MIN_COUNT,
+                              window=config.WV_WINDOW,
+                              size=config.WV_SIZE,
+                              sample=config.WV_SAMPLE,
+                              alpha=config.WV_ALPHA,
+                              min_alpha=config.WV_MIN_ALPHA,
+                              negative=config.WV_NEGATIVE,
                               workers=WORKERS,
                               )
 
@@ -127,9 +118,15 @@ if __name__ == "__main__":
     LABELS_FILE = sys.argv[1]
     MODEL_NAME = sys.argv[2]
 
+
     if not os.path.isfile(LABELS_FILE):
         print(LABELS_FILE, "not found. Exiting")
         exit()
+
+    CONFIG_FILE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
+    sys.path.append(CONFIG_FILE_DIR)
+    from lib.config import Config
+    config = Config()
 
     ## Read labels file
     with open(LABELS_FILE, 'r') as f:
@@ -149,7 +146,7 @@ if __name__ == "__main__":
 
     ## Init Word2Vec model
     print("Initializing Word2Vec model..")
-    word2vec_master = Word2VecModelGenerator(label_corpus, MODEL_NAME)
+    word2vec_master = Word2VecModelGenerator(label_corpus, MODEL_NAME, config)
 
     ## Train model
     print("Training model..")

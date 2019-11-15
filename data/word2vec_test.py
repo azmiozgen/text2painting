@@ -1,15 +1,11 @@
 import glob
 import os
-import re
-import string
+import sys
 
 import numpy as np
-import pandas as pd
-import multiprocessing
 
-from gensim.models import word2vec, Word2Vec
-from gensim.models.phrases import Phrases, Phraser
-import spacy
+from gensim.models import Word2Vec, word2vec
+
 
 def get_similar_words(model, word, topN=10):
     if model.wv.vocab.get(word):
@@ -28,8 +24,11 @@ def get_vector(model, word):
 
 
 if __name__ == "__main__":
-    ## Parameters
-    SUBSET = 'deviant_wiki'
+
+    if len(sys.argv) != 2:
+        print("Usage: python {} <subset>".format(sys.argv[0]))
+        exit()
+    SUBSET = sys.argv[1]
     MODEL_FILENAME = SUBSET + '_word2vec.model'
     MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', MODEL_FILENAME))
     TOP_N = 20
@@ -50,4 +49,3 @@ if __name__ == "__main__":
         print("Top {} similar words to {}".format(TOP_N, keyword))
         for word in similar_words:
             print('\t', word)
-
