@@ -48,6 +48,7 @@ class ResBlock(nn.Module):
         out = self.relu(out)
         return out
 
+
 class Generator(nn.Module):
     def __init__(self, config):
         super(Generator, self).__init__()
@@ -141,13 +142,18 @@ class DiscriminatorLogits(nn.Module):
         if self.bcondition and c_code is not None:
             c_code = c_code.view(-1, self.ngf, 1, 1)
             c_code = c_code.repeat(1, 1, 4, 4)
-            # state size (ngf+egf) x 4 x 4
-            h_c_code = torch.cat((h_code, c_code), 1)
+            h_c_code = torch.cat((h_code, c_code), 1)    # (ngf + ndf) x 4 x 4
         else:
             h_c_code = h_code
 
         output = self.outlogits(h_c_code)
         return output.view(-1)
+
+
+
+
+
+
 
 class GeneratorAlt1(nn.Module):
     def __init__(self):
@@ -179,7 +185,7 @@ class GeneratorAlt1(nn.Module):
     def forward(self, x):
         return self.main(x)
 
-class DiscriminatorAlt1(torch.nn.Module):
+class DiscriminatorAlt1(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(                                                ## 3 x H x W
@@ -243,3 +249,18 @@ class DiscriminatorAlt1(torch.nn.Module):
 #         out = self.conv(x)
 
 #         return out
+
+# class EncoderRNN(nn.Module):
+#     def __init__(self, input_size, hidden_size, n_layers=1):
+#         super(EncoderRNN, self).__init__()
+#         self.input_size = input_size
+#         self.hidden_size = hidden_size
+
+#         self.gru = nn.GRU(hidden_size, hidden_size, n_layers)
+
+#     def forward(self, x, hidden):
+#         output, hidden = self.gru(x, hidden)
+#         return output, hidden
+
+#     def init_hidden(self):
+#         return torch.zeros(1, self.input_size, self.hidden_size)

@@ -20,16 +20,19 @@ from .utils import ImageUtilities
 
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, subset, word2vec_model_file, load_word_vectors=False, mode='train'):
+    def __init__(self, subset, config, mode='train'):
 
         assert mode in ['train', 'val', 'test']
         self.mode = mode
+
+        self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
+        self.load_word_vectors = config.LOAD_WORD_VECTORS
         
         ## Load Word2Vec model
-        self.word2vec_model = Word2Vec.load(word2vec_model_file)
+        self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
         
         ## Load all word vectors (Not recommended if low on memory)
-        if load_word_vectors:
+        if self.load_word_vectors:
             self.word_vectors_dict = {}
             for word, _ in self.word2vec_model.wv.vocab.items():
                 self.word_vectors_dict[word] = self.word2vec_model.wv[word]
@@ -119,42 +122,31 @@ class AlignCollate(object):
     """Should be a callable (https://docs.python.org/2/library/functions.html#callable), that gets a minibatch
     and returns minibatch."""
 
-    def __init__(self, mode,
-                       word2vec_model_file,
-                       mean,
-                       std,
-                       image_size_height,
-                       image_size_width,
-                       horizontal_flipping=False,
-                       random_rotation=False,
-                       color_jittering=False,
-                       random_grayscale=False,
-                       random_channel_swapping=False,
-                       random_gamma=False,
-                       random_resolution=False,
-                       word_vectors_similar_pad=True,
-                       word_vectors_similar_pad_topN=10):
+    def __init__(self, config, mode='train'):
+                       
+        self.config = config
+        self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
+        self.mean = config.MEAN
+        self.std = config.STD
+        self.image_size_height = config.IMAGE_SIZE_HEIGHT
+        self.image_size_width = config.IMAGE_SIZE_WIDTH
+        self.horizontal_flipping = config.HORIZONTAL_FLIPPING
+        self.random_rotation = config.RANDOM_ROTATION
+        self.color_jittering = config.COLOR_JITTERING
+        self.random_grayscale = config.RANDOM_GRAYSCALE
+        self.random_channel_swapping = config.RANDOM_CHANNEL_SWAPPING
+        self.random_gamma = config.RANDOM_GAMMA
+        self.random_resolution = config.RANDOM_RESOLUTION
+
+        self.sentence_length = config.SENTENCE_LENGTH
 
         self._mode = mode
         assert self._mode in ['train', 'val']
 
         ## Load Word2Vec model
-        self.word2vec_model = Word2Vec.load(word2vec_model_file)
-        self.word_vectors_similar_pad = word_vectors_similar_pad
-        self.word_vectors_similar_pad_topN = word_vectors_similar_pad_topN
-
-        self.mean = mean
-        self.std = std
-        self.image_size_height = image_size_height
-        self.image_size_width = image_size_width
-
-        self.horizontal_flipping = horizontal_flipping
-        self.random_rotation = random_rotation
-        self.color_jittering = color_jittering
-        self.random_grayscale = random_grayscale
-        self.random_channel_swapping = random_channel_swapping
-        self.random_gamma = random_gamma
-        self.random_resolution = random_resolution
+        self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
+        self.word_vectors_similar_pad = config.WORD_VECTORS_SIMILAR_PAD
+        self.word_vectors_similar_pad_topN = config.WORD_VECTORS_SIMILAR_PAD_TOPN
 
         if self._mode == 'train':
             if self.random_resolution:
@@ -233,8 +225,9 @@ class AlignCollate(object):
 
     def _get_similar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
-        _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, topn=self.word_vectors_similar_pad_topN)
-        top_similar_words = np.array(_top_similar_words)
+        _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, 
+                                                                      topn=self.word_vectors_similar_pad_topN + 1)
+        top_similar_words = np.array(_top_similar_words)[1:]
         try:
             similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
         except ValueError:
@@ -242,48 +235,53 @@ class AlignCollate(object):
 
         return self._get_word_vector(similar_word)
 
-    def _pad_wvs_with_similar_wvs(self, word_vectors, pad_length):
+    def _pad_wvs_with_similar_wvs(self, word_vectors):
         '''
-        Equalize in-batch word vector lengths with random similar words
+        Pad word vectors array with random similar word vectors
         '''
-        final_length = len(word_vectors) + pad_length
-        while len(word_vectors) < final_length:
+        while len(word_vectors) < self.sentence_length:
             word_vector = random.choice(word_vectors)
             similar_vector = torch.Tensor(self._get_similar_wv_by_vector(word_vector)).unsqueeze(0)
             word_vectors = torch.cat((word_vectors, similar_vector))
 
         return word_vectors
     
-    def _pad_wvs_with_noise(self, word_vectors, pad_length):
+    def _pad_wvs_with_noise(self, word_vectors):
         '''
-        Equalize in-batch word vector lengths with random noise 
+        Pad word vectors array with random noise
         '''
+        pad_length = self.sentence_length - len(word_vectors)
         padding_tensor = torch.rand(pad_length, word_vectors.size()[1]) * 2 - 1   ## [-1, 1]
         word_vectors = torch.cat((word_vectors, padding_tensor))
 
         return word_vectors
 
+    def _crop_wvs(self, word_vectors):
+        '''
+        Crop word vectors array to be equal to sentence length
+        '''
+        np.random.shuffle(word_vectors)
+        word_vectors = word_vectors[:self.sentence_length]
+
+        return word_vectors
 
     def __call__(self, batch):
         images = []
         word_vectors_list = []
-        max_sentence_length = 0
         for item in batch:
             img = item[0]
             word_vectors = item[1]
             images.append(self.__preprocess(img))
-            word_vectors_list.append(word_vectors)
 
-            ## Find max sentence length
-            if len(word_vectors) > max_sentence_length:
-                max_sentence_length = len(word_vectors)
-
-        for i, word_vectors in enumerate(word_vectors_list):
-            pad_length = max_sentence_length - len(word_vectors)
-            if self.word_vectors_similar_pad:
-                word_vectors_list[i] = self._pad_wvs_with_similar_wvs(word_vectors, pad_length)
+            if len(word_vectors) < self.sentence_length:
+                if self.word_vectors_similar_pad:
+                    word_vectors = self._pad_wvs_with_similar_wvs(word_vectors)
+                else:
+                    word_vectors = self._pad_wvs_with_noise(word_vectors)
             else:
-                word_vectors_list[i] = self._pad_wvs_with_noise(word_vectors, pad_length)
+                word_vectors = self._crop_wvs(word_vectors)
+
+            word_vectors_list.append(word_vectors)
 
         images = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
@@ -296,17 +294,16 @@ class ImageBatchSampler(Sampler):
         Group image files by their image sizes # of labels and sample similar from images.
     '''
 
-    def __init__(self, subset, batch_size, shuffle_groups=True, mode='train'):
+    def __init__(self, subset, config, mode='train'):
 
         assert mode in ['train', 'val', 'test']
 
-        self.batch_size = batch_size
-        self.shuffle_groups = shuffle_groups
-
-        ## Grouping ranges
-        n_labels_ranges = [-1, 5, 7, 11, 1000]
-        width_ranges = [-1, 500, 700, 1000, 100000]
-        height_ranges = [-1, 590, 100000]
+        self.config = config
+        self.batch_size = config.BATCH_SIZE
+        self.shuffle_groups = config.SHUFFLE_GROUPS
+        n_labels_ranges = config.GROUP_N_LABELS_RANGES
+        width_ranges = config.GROUP_WIDTH_RANGES
+        height_ranges = config.GROUP_HEIGHT_RANGES
 
         data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
         subset_dir = os.path.join(data_dir, subset)

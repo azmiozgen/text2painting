@@ -1,90 +1,77 @@
-# import torch
+import torch
 
+from .arch import Generator, Discriminator
+from .utils import GANLoss
 
-# class Pix2PixModel(object):
-#     def __init__(self, config, mode='train'):
+class GANModel(object):
 
-#         self.mode = mode
+    def __init__(self, config, device, mode='train'):
 
-#         # Define networks
-#         self.G = networks.define_G(opt.input_nc,
-#                                    opt.output_nc,
-#                                    opt.ngf,
-#                                    opt.netG,
-#                                    opt.norm,
-#                                    not opt.no_dropout, opt.init_type, opt.init_gain, self.gpu_ids)
+        self.config = config
+        self.mode = mode
+        self.device = device
 
-#         # Define D; channels for D is input_nc + output_nc
-#         if self.mode == 'train':
-#             self.D = networks.define_D(opt.input_nc + opt.output_nc,
-#                                        opt.ndf,
-#                                        opt.netD,
-#                                        opt.n_layers_D,
-#                                        opt.norm,
-#                                        opt.init_type,
-#                                        opt.init_gain,
-#                                        self.gpu_ids)
+        ## Init G and D
+        self.G = Generator(config).to(device)
 
-#         if self.mode == 'train':
-#             # define loss functions
-#             self.criterionGAN = networks.GANLoss(opt.gan_mode).to(self.device)
-#             self.criterionL1 = torch.nn.L1Loss()
-#             # initialize optimizers; schedulers will be automatically created by function <BaseModel.setup>.
-#             self.optimizer_G = torch.optim.Adam(self.netG.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-#             self.optimizer_D = torch.optim.Adam(self.netD.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
-#             self.optimizers.append(self.optimizer_G)
-#             self.optimizers.append(self.optimizer_D)
+        if mode == 'train':
+            self.D = Discriminator(config).to(device)
 
-#     def set_input(self, input):
-#         """Unpack input data from the dataloader and perform necessary pre-processing steps.
-#         Parameters:
-#             input (dict): include the data itself and its metadata information.
-#         The option 'direction' can be used to swap images in domain A and domain B.
-#         """
-#         AtoB = self.opt.direction == 'AtoB'
-#         self.real_A = input['A' if AtoB else 'B'].to(self.device)
-#         self.real_B = input['B' if AtoB else 'A'].to(self.device)
-#         self.image_paths = input['A_paths' if AtoB else 'B_paths']
+            self.criterionGAN = GANLoss(config.GAN_LOSS).to(self.device)
+            self.criterionL1 = torch.nn.L1Loss()
+            self.G_optimizer = torch.optim.Adam(self.G.parameters(), lr=config.LR, betas=(config.BETA, 0.999))
+            self.D_optimizer = torch.optim.Adam(self.D.parameters(), lr=config.LR, betas=(config.BETA, 0.999))
 
-#     def forward(self):
-#         """Run forward pass; called by both functions <optimize_parameters> and <test>."""
-#         self.fake_B = self.netG(self.real_A)  # G(A)
+    def set_requires_grad(self, net, requires_grad=False):
+        for param in net.parameters():
+            param.requires_grad = requires_grad
+        return net
 
-#     def backward_D(self):
-#         """Calculate GAN loss for the discriminator"""
-#         # Fake; stop backprop to the generator by detaching fake_B
-#         fake_AB = torch.cat((self.real_A, self.fake_B), 1)  # we use conditional GANs; we need to feed both input and output to the discriminator
-#         pred_fake = self.netD(fake_AB.detach())
-#         self.loss_D_fake = self.criterionGAN(pred_fake, False)
-#         # Real
-#         real_AB = torch.cat((self.real_A, self.real_B), 1)
-#         pred_real = self.netD(real_AB)
-#         self.loss_D_real = self.criterionGAN(pred_real, True)
-#         # combine loss and calculate gradients
-#         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
-#         self.loss_D.backward()
+    def reshape_images(self, data):
+        pass
 
-#     def backward_G(self):
-#         """Calculate GAN and L1 loss for the generator"""
-#         # First, G(A) should fake the discriminator
-#         fake_AB = torch.cat((self.real_A, self.fake_B), 1)
-#         pred_fake = self.netD(fake_AB)
-#         self.loss_G_GAN = self.criterionGAN(pred_fake, True)
-#         # Second, G(A) = B
-#         self.loss_G_L1 = self.criterionL1(self.fake_B, self.real_B) * self.opt.lambda_L1
-#         # combine loss and calculate gradients
-#         self.loss_G = self.loss_G_GAN + self.loss_G_L1
-#         self.loss_G.backward()
+    def backward_D(self, real_images, real_wv_images, fake_images, fake_wv_images):
+        # Real-real
+        real_real = torch.cat((real_images, real_wv_images), 1)
+        pred_rr = self.D(real_real)
+        self.loss_D_rr = self.criterionGAN(pred_rr, target_is_real=True)
 
-#     def optimize_parameters(self):
-#         self.forward()                   # compute fake images: G(A)
-#         # update D
-#         self.set_requires_grad(self.netD, True)  # enable backprop for D
-#         self.optimizer_D.zero_grad()     # set D's gradients to zero
-#         self.backward_D()                # calculate gradients for D
-#         self.optimizer_D.step()          # update D's weights
-#         # update G
-#         self.set_requires_grad(self.netD, False)  # D requires no gradients when optimizing G
-#         self.optimizer_G.zero_grad()        # set G's gradients to zero
-#         self.backward_G()                   # calculate graidents for G
-#         self.optimizer_G.step()             # udpate G's weights
+        ## Real-fake
+        real_fake = torch.cat((real_images, fake_wv_images), 1)
+        pred_rf = self.D(real_fake.detach())
+        self.loss_D_rf = self.criterionGAN(pred_rf, target_is_real=False)
+
+        ## Fake-real
+        fake_real = torch.cat((fake_images, real_wv_images), 1)
+        pred_fr = self.D(fake_real.detach())
+        self.loss_D_fr = self.criterionGAN(pred_fr, target_is_real=False)
+
+        self.loss_D = self.loss_D_rr + self.loss_D_rf + 0.5 * self.loss_D_fr
+        self.loss_D.backward()
+
+    def backward_G(self, real_images, real_wv_images, fake_images):
+        ## Fake-real
+        fake_real = torch.cat((fake_images, real_wv_images), 1)
+        pred_fr = self.D(fake_real.detach())
+        
+        self.loss_G_GAN = self.criterionGAN(pred_fr, target_is_real=True)
+        self.loss_G_L1 = self.criterionL1(fake_images, real_images) * self.config.LAMBDA_L1
+
+        self.loss_G = self.loss_G_GAN + self.loss_G_L1
+        self.loss_G.backward()
+
+    def fit(self, data):
+        real_images, real_wv_images, fake_wv_images = data
+        fake_images = self.G(real_images)
+
+        # Update D
+        self.D = self.set_requires_grad(self.D, True)     # Enable backprop for D
+        self.D_optimizer.zero_grad()                      # Set D's gradients to zero
+        self.backward_D(real_images, real_wv_images, fake_images, fake_wv_images)
+        self.D_optimizer.step()
+
+        # Update G
+        self.D = self.set_requires_grad(self.D, False)    # Disable backprop for D
+        self.G_optimizer.zero_grad()                      # Set G's gradients to zero
+        self.backward_G(real_images, real_wv_images, fake_images)                   
+        self.G_optimizer.step()
