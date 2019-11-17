@@ -1,89 +1,116 @@
-# import argparse
-# import datetime
-# import getpass
-# import os
-# import random
-# import shutil
+import glob
+import os
+import sys
+import time
+from multiprocessing import cpu_count
 
-# import numpy as np
-# import torch
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from PIL import Image, ImageFilter
+import torch
+import torch.nn as nn
 
-# from lib import AlignCollate, ClsDataset, Model
-# from settings import TrainingSettings
+from gensim.models import Word2Vec
+from lib.arch import Generator, Discriminator
+from lib.config import Config
+from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
+from lib.model import GANModel
+from torch.utils.data import DataLoader
 
-# ts = TrainingSettings()
+DATA_DIR = 'united_small'
+BATCH_SIZE = 2
+N_EPOCHS = 10
+# N_WORKERS = cpu_count() - 1
+N_WORKERS = 0
+DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--model', default='', help='path to model (to continue training)')
-# parser.add_argument('--usegpu', action='store_true', help='enables cuda to train on gpu')
-# parser.add_argument('--nepochs', type=int, default=200, help='number of epochs to train for')
-# parser.add_argument('--batchsize', type=int, default=128, help='input batch size')
-# parser.add_argument('--nworkers', type=int, help='number of data loading workers [0 to do it using main process]', default=1)
-# opt = parser.parse_args()
+CONFIG = Config()
 
-# def generate_run_id():
+if __name__ == "__main__":
 
-#     username = getpass.getuser()
+    ## Data loaders
+    train_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='train')
+    val_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='val')
+    train_align_collate = AlignCollate(CONFIG, 'train')
+    val_align_collate = AlignCollate(CONFIG, 'val')
+    train_batch_sampler = ImageBatchSampler(DATA_DIR, CONFIG, mode='train')
+    val_batch_sampler = ImageBatchSampler(DATA_DIR, CONFIG, mode='val')
+    train_loader = DataLoader(train_dataset,
+                            batch_size=BATCH_SIZE,
+                            shuffle=False,
+                            num_workers=N_WORKERS,
+                            pin_memory=True,
+                            collate_fn=train_align_collate,
+                            sampler=train_batch_sampler,
+                            )
+    val_loader = DataLoader(val_dataset,
+                            batch_size=BATCH_SIZE,
+                            shuffle=False,
+                            num_workers=N_WORKERS,
+                            pin_memory=True,
+                            collate_fn=val_align_collate,
+                            sampler=val_batch_sampler
+                            )
 
-#     now = datetime.datetime.now()
-#     date = list(map(str, [now.year, now.month, now.day]))
-#     coarse_time = list(map(str, [now.hour, now.minute]))
-#     fine_time = list(map(str, [now.second, now.microsecond]))
+    ## Init model with G and D
+    model = GANModel(config, DEVICE, mode='train')
 
-#     run_id = '_'.join(['-'.join(date), '-'.join(coarse_time), username, '-'.join(fine_time)])
-#     return run_id
+    model.G.train()
+    model.D.train()
 
-# RUN_ID = generate_run_id()
-# model_save_path = os.path.abspath(os.path.join(os.path.abspath(__file__), os.path.pardir, 'models', RUN_ID))
-# os.mkdir(model_save_path)
+    for epoch in range(N_EPOCHS):
+        epoch_start = time.time()
+        total_g_loss = 0.0
+        total_d_loss = 0.0
+        
+        for phase in ['train', 'val']:
+            if phase == 'train':
+                data_loader = train_loader
+            else:
+                data_loader = val_loader
 
-# CODE_BASE_DIR = os.path.abspath(os.path.join(os.path.abspath(__file__), os.path.pardir))
-# shutil.copytree(os.path.join(CODE_BASE_DIR, 'settings'), os.path.join(model_save_path, 'settings'))
-# shutil.copytree(os.path.join(CODE_BASE_DIR, 'lib'), os.path.join(model_save_path, 'lib'))
+            for i, data in enumerate(data_loader):
 
-# init_fp = open(os.path.join(model_save_path, '__init__.py'), 'w')
-# init_fp.close()
+                batch_size = images.size()[0]
 
-# if torch.cuda.is_available() and not opt.usegpu:
-#     print('WARNING: You have a CUDA device, so you should probably run with --cuda')
+                real_images, real_wv_images, fake_wv_images = data
 
-# # Load Seeds
-# random.seed(ts.SEED)
-# np.random.seed(ts.SEED)
-# torch.manual_seed(ts.SEED)
+                ## Fşt batch
+                model.fit(data)
 
-# # Define Data Loaders
-# pin_memory = False
-# if opt.usegpu:
-#     pin_memory = True
+                # Update total loss
+                loss_g, loss_d = model.get_loss()
+                total_g_loss += loss_g.item()
+                total_d_loss += loss_d.item()
 
-# train_dataset = ClsDataset(ts.TRAINING_LMDB)
-# train_align_collate = AlignCollate('training', ts.LABELS, ts.MEAN, ts.STD, ts.IMAGE_SIZE_HEIGHT, ts.IMAGE_SIZE_WIDTH,
-#                                    horizontal_flipping=ts.HORIZONTAL_FLIPPING,
-#                                    random_rotation=ts.RANDOM_ROTATION,
-#                                    color_jittering=ts.COLOR_JITTERING, random_grayscale=ts.RANDOM_GRAYSCALE,
-#                                    random_channel_swapping=ts.RANDOM_CHANNEL_SWAPPING, random_gamma=ts.RANDOM_GAMMA,
-#                                    random_resolution=ts.RANDOM_RESOLUTION)
+                # Print logs
+                if i % 20 == 0:
+                    print('[{0:3d}/{1}] {2:3d}/{3} loss_g: {4:.4f} | loss_d: {5:4f}'
+                        .format(epoch + 1, N_EPOCHS, i + 1, len(data_loader), loss_g.item(), loss_d.item()))
 
-# assert train_dataset
-# train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=opt.batchsize, shuffle=True,
-#                                            num_workers=opt.nworkers, pin_memory=pin_memory, collate_fn=train_align_collate)
+            print("Epoch time: {}".format(time.time() - epoch_start))
 
-# test_dataset = ClsDataset(ts.VALIDATION_LMDB)
-# test_align_collate = AlignCollate('test', ts.LABELS, ts.MEAN, ts.STD, ts.IMAGE_SIZE_HEIGHT, ts.IMAGE_SIZE_WIDTH,
-#                                   horizontal_flipping=ts.HORIZONTAL_FLIPPING,
-#                                   random_rotation=ts.RANDOM_ROTATION,
-#                                   color_jittering=ts.COLOR_JITTERING, random_grayscale=ts.RANDOM_GRAYSCALE,
-#                                   random_channel_swapping=ts.RANDOM_CHANNEL_SWAPPING, random_gamma=ts.RANDOM_GAMMA,
-#                                   random_resolution=ts.RANDOM_RESOLUTION)
+            break
 
-# assert test_dataset
-# test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=opt.batchsize, shuffle=False,
-#                                           num_workers=opt.nworkers, pin_memory=pin_memory, collate_fn=test_align_collate)
-
-# # Define Model
-# model = Model(ts.MODEL, ts.N_CLASSES, load_model_path=opt.model, usegpu=opt.usegpu)
-
-# # Train Model
-# model.fit(ts.LEARNING_RATE, ts.WEIGHT_DECAY, ts.CLIP_GRAD_NORM, ts.LR_DROP_FACTOR, ts.LR_DROP_PATIENCE, ts.OPTIMIZER,
-#           opt.nepochs, train_loader, test_loader, model_save_path)
+        #     # Save your model weights
+        #     if (epoch + 1) % 5 == 0:
+        #         save_dict = {
+        #             'g':G.state_dict(), 
+        #             'g_optim':optimizer_g.state_dict(),
+        #             'd': D.state_dict(),
+        #             'd_optim': optimizer_d.state_dict()
+        #         }
+        #         torch.save(save_dict, os.path.join(MODEL_PATH, 'checkpoint_{}.pth'.format(epoch + 1)))
+                
+        #     # Merge noisy input, ground truth and network output so that you can compare your results side by side
+        #     out = torch.cat([img, fake], dim=2).detach().cpu().clamp(0.0, 1.0)
+        #     vutils.save_image(out, os.path.join(OUTPUT_PATH, "{}_{}.png".format(epoch, i)), normalize=True)
+            
+        #     # Calculate avarage loss for the current epoch
+        #     avg_g_loss = total_g_loss / len(data_loader)
+        #     avg_d_loss = total_d_loss / len(data_loader)
+        #     print('Epoch[{}] Training Loss G: {:4f} | D: {:4f}'.format(epoch + 1, avg_g_loss, avg_d_loss))
+            
+        #     cache_train_g.append(avg_g_loss)
+        #     cache_train_d.append(avg_d_loss)
