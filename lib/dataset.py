@@ -108,11 +108,11 @@ class TextArtDataLoader(Dataset):
 
         ## If empty, make zero vector
         if len(word_vectors) == 0:
-            word_vectors = torch.zeros(1, self.word2vec_model.vector_size)
+            word_vectors_tensor = torch.zeros(1, self.word2vec_model.vector_size)
         else:
-            word_vectors = torch.Tensor(word_vectors)
+            word_vectors_tensor = torch.Tensor(word_vectors)
 
-        return img, word_vectors
+        return img, word_vectors_tensor
 
     def __len__(self):
         return len(self.image_files)
@@ -147,6 +147,7 @@ class AlignCollate(object):
         self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
         self.word_vectors_similar_pad = config.WORD_VECTORS_SIMILAR_PAD
         self.word_vectors_similar_pad_topN = config.WORD_VECTORS_SIMILAR_PAD_TOPN
+        self.word_vectors_dissimilar_topN = config.WORD_VECTORS_DISSIMILAR_TOPN
 
         if self._mode == 'train':
             if self.random_resolution:
@@ -227,13 +228,14 @@ class AlignCollate(object):
         word_vector = np.array(word_vector)
         _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, 
                                                                       topn=self.word_vectors_similar_pad_topN + 1)
-        top_similar_words = np.array(_top_similar_words)[1:]
+        top_similar_words = np.array(_top_similar_words)[1:]   ## Do not take word itself (the most similar)
         try:
             similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
         except ValueError:
             similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=True)[0]
 
         return self._get_word_vector(similar_word)
+
 
     def _pad_wvs_with_similar_wvs(self, word_vectors):
         '''
@@ -265,14 +267,37 @@ class AlignCollate(object):
 
         return word_vectors
 
+    def _get_dissimilar_wv_by_vector(self, word_vector):
+        word_vector = np.array(word_vector)
+        topN = self.word_vectors_dissimilar_topN
+        _top_dissimilar_words = self.word2vec_model.wv.similar_by_vector(word_vector, 
+                                                                         topn=100000000)[-topN:]
+        top_dissimilar_words = np.array(_top_dissimilar_words)
+        try:
+            dissimilar_word = np.random.choice(top_dissimilar_words[:, 0], 1, replace=False)[0]
+        except ValueError:
+            dissimilar_word = np.random.choice(top_dissimilar_words[:, 0], 1, replace=True)[0]
+
+        return self._get_word_vector(dissimilar_word)
+
+    def _generate_dissimilar_wvs(self, word_vectors):
+        fake_word_vectors = []
+        for wv in word_vectors:
+            fake_wv = self._get_dissimilar_wv_by_vector(wv)
+            fake_word_vectors.append(fake_wv)
+        
+        return fake_word_vectors
+
     def __call__(self, batch):
         images = []
         word_vectors_list = []
+        fake_word_vectors_list = []
         for item in batch:
             img = item[0]
             word_vectors = item[1]
             images.append(self.__preprocess(img))
 
+            ## Pad or crop true wvs
             if len(word_vectors) < self.sentence_length:
                 if self.word_vectors_similar_pad:
                     word_vectors = self._pad_wvs_with_similar_wvs(word_vectors)
@@ -280,13 +305,17 @@ class AlignCollate(object):
                     word_vectors = self._pad_wvs_with_noise(word_vectors)
             else:
                 word_vectors = self._crop_wvs(word_vectors)
-
             word_vectors_list.append(word_vectors)
+
+            ## Get fake wvs
+            fake_word_vectors = torch.Tensor(self._generate_dissimilar_wvs(word_vectors))
+            fake_word_vectors_list.append(fake_word_vectors)
 
         images = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
+        fake_word_vectors_tensor = torch.stack(fake_word_vectors_list)
 
-        return images, word_vectors_tensor
+        return images, word_vectors_tensor, fake_word_vectors_tensor
 
 
 class ImageBatchSampler(Sampler):
@@ -394,9 +423,11 @@ class ImageBatchSampler(Sampler):
 
 if __name__ == "__main__":
 
-    WORD2VEC_MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', 'deviant_wiki_word2vec.model'))
+    from config import Config
+    CONFIG = Config()
+    DATA_DIR = 'united'
     
     ## Test TextArtDataLoader
-    train_dataset = TextArtDataLoader(['wikiart', 'deviantart'], word2vec_model_file=WORD2VEC_MODEL_FILE, mode='train')
+    train_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='train')
     print("Size:", len(train_dataset))
     print(train_dataset[0])

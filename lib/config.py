@@ -54,6 +54,7 @@ class Config():
         self.LOAD_WORD_VECTORS = True
         self.WORD_VECTORS_SIMILAR_PAD = True
         self.WORD_VECTORS_SIMILAR_PAD_TOPN = 10
+        self.WORD_VECTORS_DISSIMILAR_TOPN = 10
 
         ## GAN options
         self.N_INPUT = 1 * 2000    ## TODO: Depends on wv feature size and sentence size
@@ -63,10 +64,11 @@ class Config():
         self.LAMBDA_L1 = 10.0
 
         ## Hyper-params
-        self.BATCH_SIZE = 128
+        self.BATCH_SIZE = 4
         self.N_EPOCHS = 50
         self.LR = 2e-4
         self.BETA = 0.5
+        self.WEIGHT_DECAY = 1e-4
 
         ## Hardware
         self.N_WORKERS = 0

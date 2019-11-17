@@ -27,7 +27,8 @@ class GANModel(object):
             param.requires_grad = requires_grad
         return net
 
-    def reshape_images(self, data):
+    def prepare_data(self, data):
+        ## RESHAPE and to DEVICE
         pass
 
     def backward_D(self, real_images, real_wv_images, fake_images, fake_wv_images):
@@ -60,8 +61,15 @@ class GANModel(object):
         self.loss_G = self.loss_G_GAN + self.loss_G_L1
         self.loss_G.backward()
 
+    ## TODO
+    def get_loss(self):
+        return self.loss_G, self.lossD
+
     def fit(self, data):
         real_images, real_wv_images, fake_wv_images = data
+
+        self.prepare_data(data)
+        
         fake_images = self.G(real_images)
 
         # Update D
