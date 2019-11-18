@@ -70,7 +70,7 @@ if __name__ == '__main__':
             sh.write(image_relative_file + ',' + str(img_size[0]) + ',' + str(img_size[1]) + '\n')
 
         means_of_means = np.array(means).mean(axis=1)
-        means_of_stds = np.array(stds).std(axis=1)
+        means_of_stds = np.array(stds).mean(axis=1)
         st.write("{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n".format(
                                                             np.mean(widths), np.mean(heights),
                                                             means_of_means[0], means_of_means[1], means_of_means[2],

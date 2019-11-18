@@ -213,8 +213,8 @@ class AlignCollate(object):
                 image = self.grayscaler(image)
 
         image = self.resizer(image)
-        image = to_tensor(image)
-        #image = self.normalizer(image)
+        # image = to_tensor(image)   ## Only to cancelling normalizing and see images
+        image = self.normalizer(image)
 
         return image
 
@@ -311,11 +311,11 @@ class AlignCollate(object):
             fake_word_vectors = torch.Tensor(self._generate_dissimilar_wvs(word_vectors))
             fake_word_vectors_list.append(fake_word_vectors)
 
-        images = torch.stack(images)
+        images_tensor = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
         fake_word_vectors_tensor = torch.stack(fake_word_vectors_list)
 
-        return images, word_vectors_tensor, fake_word_vectors_tensor
+        return images_tensor, word_vectors_tensor, fake_word_vectors_tensor
 
 
 class ImageBatchSampler(Sampler):

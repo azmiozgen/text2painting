@@ -53,17 +53,17 @@ class Generator(nn.Module):
     def __init__(self, config):
         super(Generator, self).__init__()
 
-        ninput = config.N_INPUT
+        n_input = config.N_INPUT
         ngf = config.NGF * 8
-        self.ninput = ninput
+        n_channel = config.N_CHANNELS
+        self.n_input = n_input
         self.ngf = ngf
 
-        # -> ngf x 4 x 4
         self.fc = nn.Sequential(
-                               nn.Linear(ninput, ngf * 4 * 4, bias=False),
+                               nn.Linear(n_input, ngf * 4 * 4, bias=False),
                                nn.BatchNorm1d(ngf * 4 * 4),
                                nn.ReLU(True)
-                               )
+                               )                                 # -> ngf x 4 x 4
 
         self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x 4 x 4 -> ngf/2 x 8 x 8
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 16 x 16
@@ -71,7 +71,7 @@ class Generator(nn.Module):
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 64 x 64
 
         self.image = nn.Sequential(
-                                  conv3x3(ngf // 16, 3),
+                                  conv3x3(ngf // 16, n_channel),
                                   nn.Tanh()
                                   )                              # -> 3 x 64 x 64
 
@@ -91,24 +91,25 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         ndf = config.NDF
         ngf = config.NGF
+        n_channel = config.N_CHANNELS * 2   ## Stitching images and word vectors
         self.ndf = ndf
         self.ngf = ngf
 
-        self.conv = nn.Sequential(                                                        # (3) x H x W
-                                       nn.Conv2d(3, ndf, 4, 2, 1, bias=False),            # (ndf) x H/2 x W/2
-                                       nn.LeakyReLU(0.2, inplace=True),
-                                       nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4
-                                       nn.BatchNorm2d(ndf * 2),
-                                       nn.LeakyReLU(0.2, inplace=True),
-                                       nn.Conv2d(ndf*2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
-                                       nn.BatchNorm2d(ndf * 4),
-                                       nn.LeakyReLU(0.2, inplace=True),
-                                       nn.Conv2d(ndf*4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
-                                       nn.BatchNorm2d(ndf * 8),
-                                       nn.LeakyReLU(0.2, inplace=True)
-        )
+        self.conv = nn.Sequential(                                                        # (6) x H x W
+                                 nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),    # (ndf) x H/2 x W/2
+                                 nn.LeakyReLU(0.2, inplace=True),
+                                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4
+                                 nn.BatchNorm2d(ndf * 2),
+                                 nn.LeakyReLU(0.2, inplace=True),
+                                 nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
+                                 nn.BatchNorm2d(ndf * 4),
+                                 nn.LeakyReLU(0.2, inplace=True),
+                                 nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
+                                 nn.BatchNorm2d(ndf * 8),
+                                 nn.LeakyReLU(0.2, inplace=True)
+                                 )
 
-        self.get_cond_logits = DiscriminatorLogits(ndf, ngf)
+        self.get_cond_logits = DiscriminatorLogits(ndf, ngf, bcondition=False)
         self.get_uncond_logits = None
 
     def forward(self, image):
@@ -151,7 +152,7 @@ class DiscriminatorLogits(nn.Module):
 
 
 
-
+## ------------------------------------------------
 
 
 
