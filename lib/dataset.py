@@ -20,7 +20,7 @@ from .utils import ImageUtilities
 
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, subset, config, mode='train'):
+    def __init__(self, config, mode='train'):
 
         assert mode in ['train', 'val', 'test']
         self.mode = mode
@@ -39,10 +39,9 @@ class TextArtDataLoader(Dataset):
         else:
             self.word_vectors_dict = None
 
-        data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
-        subset_dir = os.path.join(data_dir, subset)
+        data_dir = config.DATA_DIR
         label_filename = '{}_labels.csv'.format(self.mode)
-        label_file = os.path.join(subset_dir, label_filename)
+        label_file = os.path.join(data_dir, label_filename)
 
         if not os.path.isfile(label_file):
             print(label_file, "not found. Exiting.")
@@ -323,7 +322,7 @@ class ImageBatchSampler(Sampler):
         Group image files by their image sizes # of labels and sample similar from images.
     '''
 
-    def __init__(self, subset, config, mode='train'):
+    def __init__(self, config, mode='train'):
 
         assert mode in ['train', 'val', 'test']
 
@@ -334,12 +333,11 @@ class ImageBatchSampler(Sampler):
         width_ranges = config.GROUP_WIDTH_RANGES
         height_ranges = config.GROUP_HEIGHT_RANGES
 
-        data_dir = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'data'))
-        subset_dir = os.path.join(data_dir, subset)
+        data_dir = config.DATA_DIR
         labels_filename = '{}_labels.csv'.format(mode)
-        labels_file = os.path.join(subset_dir, labels_filename)
+        labels_file = os.path.join(data_dir, labels_filename)
         shapes_filename = '{}_image_shapes.csv'.format(mode)
-        shapes_file = os.path.join(subset_dir, shapes_filename)
+        shapes_file = os.path.join(data_dir, shapes_filename)
 
         ## Read labels file
         with open(labels_file, 'r') as f:

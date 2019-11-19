@@ -1,10 +1,13 @@
 import os
 import shutil
 
+import numpy as np
+from PIL import Image
 import torch
+from torchvision.utils import make_grid
 
 from .arch import Generator, Discriminator
-from .utils import GANLoss, get_uuid
+from .utils import GANLoss, get_uuid, words2image, ImageUtilities
 
 class GANModel(object):
 
@@ -131,8 +134,8 @@ class GANModel(object):
         with open(val_log_file, 'w') as f:
             f.write(self.log_header + '\n')
 
-    def save_model_dict(self, epoch, loss_g, loss_d):
-        model_filename = "{}_{:04}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, loss_g, loss_d)
+    def save_model_dict(self, epoch, iteration, loss_g, loss_d):
+        model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
         model_file = os.path.join(self.model_dir, model_filename)
         save_dict = {
                     'g' : self.G.state_dict(), 
@@ -148,6 +151,54 @@ class GANModel(object):
         with open(log_file, 'a') as f:
             f.write(log_row_str)
 
+    def generate_grid(self, real_wv_tensor, real_images_tensor, word2vec_model):
+        ## Generate fake image
+        fake_images_tensor = self.forward(real_wv_tensor)
+
+        images_bag = []
+        for i, (fake_image, real_image, real_wvs) in enumerate(zip(fake_images_tensor, real_images_tensor, real_wv_tensor)):
+            words = []
+
+            ## Get words from word vectors
+            for real_wv in real_wvs:
+                real_wv = np.array(real_wv)
+                word, _ = word2vec_model.wv.similar_by_vector(real_wv)[0]
+                words.append(word)
+
+            ## Words are visualized by converting image
+            word_image = words2image(words)
+
+            ## Inverse normalize  ## TODO if input not normalized remove it
+            fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
+            real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
+
+            ## Go to cpu numpy array
+            fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
+            real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
+
+            images_bag.extend([word_image, fake_image, real_image])
+
+        images_bag = np.array(images_bag)
+        grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=6).permute(1, 2, 0)
+        grid_pil = Image.fromarray(np.array(grid * 255, dtype=np.uint8))
+        return grid_pil
+
+    def save_output(self, img_pil, filename):
+        output_dir = os.path.join(self.model_dir, 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, filename)
+        img_pil.save(output_file)
+
+    def forward(self, real_wv_tensor):
+        ## Data to device
+        real_wv_tensor = real_wv_tensor.to(self.device)
+
+        ## Forward G
+        real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1)
+        fake_images_tensor = self.G(real_wv_flat_tensor)
+
+        return fake_images_tensor
+
     def fit(self, data, phase='train'):
         ## Data to device
         real_images_tensor, real_wv_tensor, fake_wv_tensor = data
@@ -157,8 +208,7 @@ class GANModel(object):
         data = real_images_tensor, real_wv_tensor, fake_wv_tensor
 
         ## Forward G
-        real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1)
-        fake_images_tensor = self.G(real_wv_flat_tensor)
+        fake_images_tensor = self.forward(fake_wv_tensor)
         # print("G output:", fake_images_tensor.shape)
 
         ## Stich images and word vectors on channel axis
@@ -179,3 +229,5 @@ class GANModel(object):
             self.G_optimizer.zero_grad()                      # Set G's gradients to zero
             self.backward_G(fr_pair, real_images_tensor, fake_images_tensor)                   
             self.G_optimizer.step()
+
+

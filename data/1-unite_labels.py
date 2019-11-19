@@ -5,11 +5,13 @@ import re
 import sys
 import warnings
 
+import numpy as np
 from PIL import Image
 
 if __name__ == '__main__':
 
     SUBSET_LIST = ['deviantart', 'wikiart']
+    FRACTION = 0.1  ## To prepare smaller dataset, make 1.0 to take all
 
     if len(sys.argv) != 2:
         print("Usage: python {} <output_dir>".format(sys.argv[0]))
@@ -36,6 +38,10 @@ if __name__ == '__main__':
         with open(labels_file, 'r') as f:
             lines = f.readlines()
 
+        ## Fraction the lines
+        fraction = FRACTION / len(SUBSET_LIST)
+        lines = sorted(np.random.choice(lines, int(len(lines) * FRACTION), replace=False))
+
         for line in lines:
             row = line.strip().split(',')
             image_filename = row[0]
@@ -51,7 +57,7 @@ if __name__ == '__main__':
                 if img.mode != 'RGB': 
                     img = img.convert('RGB') 
             except (Exception, Warning) as e:
-                print("Bad image,", image_file, e)
+                print("Bad image", image_file, e)
                 continue
 
             ## Normalize tokens
@@ -64,6 +70,7 @@ if __name__ == '__main__':
             all_lines.append(image_relative_file + ',' + label_sentence + '\n')
 
             image_file_counter += 1
+
 
     with open(OUTPUT_FILE, 'w') as f:
         f.writelines(all_lines)

@@ -8,11 +8,12 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        self.DATA_DIR = os.path.join(self.BASE_DIR, 'data')
+        SUBSET = 'united'
+        self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
-        self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, 'united_word2vec.model')
-        self.MODEL_NAME = 'united'
+        self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, SUBSET + '_word2vec.model')
+        self.MODEL_NAME = SUBSET
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss'
 
         ## Shapes  !!! L X S = C x W x H !!!
@@ -45,7 +46,8 @@ class Config():
         self.SHUFFLE_GROUPS = True
         self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
         self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
-        self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
         self.HORIZONTAL_FLIPPING = False
@@ -71,7 +73,7 @@ class Config():
 
         ## Hyper-params
         self.BATCH_SIZE = 16
-        self.N_EPOCHS = 10
+        self.N_EPOCHS = 1
         self.LR = 2e-4
         self.BETA = 0.5
         self.WEIGHT_DECAY = 1e-4
@@ -84,4 +86,5 @@ class Config():
         ## Logging
         self.N_PRINT_BATCH = 200
         self.N_LOG_BATCH = 200
+        self.N_SAVE_VISUALS_BATCH = 200
         self.N_SAVE_MODEL_EPOCHS = 1

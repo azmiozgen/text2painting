@@ -18,7 +18,6 @@ from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
 from lib.model import GANModel
 from torch.utils.data import DataLoader
 
-DATA_DIR = 'united'
 CONFIG = Config()
 
 if __name__ == "__main__":
@@ -30,12 +29,12 @@ if __name__ == "__main__":
 
     ## Data loaders
     print("\nData loaders initializing..")
-    train_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='train')
-    val_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='val')
+    train_dataset = TextArtDataLoader(CONFIG, mode='train')
+    val_dataset = TextArtDataLoader(CONFIG, mode='val')
     train_align_collate = AlignCollate(CONFIG, 'train')
     val_align_collate = AlignCollate(CONFIG, 'val')
-    train_batch_sampler = ImageBatchSampler(DATA_DIR, CONFIG, mode='train')
-    val_batch_sampler = ImageBatchSampler(DATA_DIR, CONFIG, mode='val')
+    train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
+    val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
     train_loader = DataLoader(train_dataset,
                               batch_size=CONFIG.BATCH_SIZE,
                               shuffle=False,
@@ -68,15 +67,17 @@ if __name__ == "__main__":
     print("\nTraining starting..")
     for epoch in range(CONFIG.N_EPOCHS):
         print("Epoch {}/{}:".format(epoch + 1, CONFIG.N_EPOCHS))
-        epoch_start = time.time()
         total_loss_g = 0.0
         total_loss_d = 0.0
 
-        for phase in ['train']:
-            print("\t{} phase".format(phase.title()))
+        for phase in ['train', 'val']:
+            phase_start = time.time()
+            print("\t{} phase:".format(phase.title()))
             if phase == 'train':
-                data_loader = val_loader  ## TODO
-                n_batch = n_val_batch
+                # data_loader = val_loader  ## TODO
+                # n_batch = n_val_batch
+                data_loader = train_loader
+                n_batch = n_train_batch
                 model.G.train()
                 model.D.train()
             else:
@@ -101,6 +102,7 @@ if __name__ == "__main__":
 
                 # Update total loss
                 loss_g, loss_d = model.get_loss()
+                # loss_g, loss_d = -1.0, -1.0
                 total_loss_g += loss_g
                 total_loss_d += loss_d
 
@@ -113,18 +115,21 @@ if __name__ == "__main__":
                     print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
                     print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d))
 
-        total_loss_g /= n_batch
-        total_loss_d /= n_batch
-        print("\tEpoch time: {:.2f} seconds".format(time.time() - epoch_start))
-        print("\t\tTotal G loss: {:.4f} | Total D loss: {:.4f}".format(total_loss_g, total_loss_d))
+                ## Save visual outputs
+                try:
+                    if i % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
+                        output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
+                        grid_img_pil = model.generate_grid(real_wv_tensor, real_images, train_dataset.word2vec_model)
+                        model.save_output(grid_img_pil, output_filename)
+                except Exception as e:
+                    print(e, 'Passing.')
+
+            total_loss_g /= n_batch
+            total_loss_d /= n_batch
+            print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
+            print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
 
         ## Save model
         if (epoch + 1) % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
-            model.save_model_dict(epoch + 1, total_loss_g, total_loss_d)
+            model.save_model_dict(epoch + 1, iteration, total_loss_g, total_loss_d)
             
-        # # Merge noisy input, ground truth and network output so that you can compare your results side by side
-        # out = torch.cat([img, fake], dim=2).detach().cpu().clamp(0.0, 1.0)
-        # vutils.save_image(out, os.path.join(OUTPUT_PATH, "{}_{}.png".format(epoch, i)), normalize=True)
-        
-        # cache_train_g.append(avg_g_loss)
-        # cache_train_d.append(avg_d_loss)

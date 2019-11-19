@@ -1,13 +1,14 @@
 from io import BytesIO, StringIO
 import uuid
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 from .preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
-                         RandomResizedCrop, RandomResolution, RandomRotate)
+                         RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
 
 
 class GANLoss(nn.Module):
@@ -100,6 +101,10 @@ class ImageUtilities(object):
         return transforms.Compose([transforms.ToTensor(), transforms.Normalize(mean=mean, std=std)])
 
     @staticmethod
+    def image_inverse_normalizer(mean, std):
+        return InvNormalization(mean=mean, std=std)
+
+    @staticmethod
     def image_random_rotator(interpolation=Image.BILINEAR, random_bg=True):
         return RandomRotate(interpolation=interpolation, random_bg=random_bg)
 
@@ -125,3 +130,18 @@ class ImageUtilities(object):
 
 def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
+
+def words2image(text_list, image_shapes=(64, 64)):
+    w, h = image_shapes
+
+    img = Image.fromarray(np.ones(image_shapes))
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype("Lato-Medium.ttf", 7)
+    
+    x = int(w * 0.1)
+    y0 = int(h * 0.01)
+    for i, text in enumerate(text_list):
+        y = i * len(text_list) + y0
+        draw.text((x, y), text, 0, font=font)
+
+    return np.array(img.convert('RGB'))

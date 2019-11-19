@@ -32,34 +32,33 @@ class StemmingLemmatization():
 
 class Word2VecModelGenerator():
 
-    def __init__(self, label_corpus, model_output_name, config):
+    def __init__(self, label_corpus, config):
         '''
             label_corpus : List of label tokens. Passed from stemmer and lemmatizer preferably.
             model_output_name : String 
         '''
 
-        MODEL_OUTPUT_FILENAME = model_output_name + '_word2vec.model'
-        MODEL_OUTPUT_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', MODEL_OUTPUT_FILENAME))
         WORKERS = multiprocessing.cpu_count() - 1
-
         self.label_corpus = label_corpus
         self.epochs = config.WV_EPOCHS
-        self.model_output_file = MODEL_OUTPUT_FILE
-        self.model = Word2Vec(min_count=config.WV_MIN_COUNT,
-                              window=config.WV_WINDOW,
-                              size=config.WV_SIZE,
-                              sample=config.WV_SAMPLE,
-                              alpha=config.WV_ALPHA,
-                              min_alpha=config.WV_MIN_ALPHA,
-                              negative=config.WV_NEGATIVE,
-                              workers=WORKERS,
-                              )
+        self.model_output_file = config.WORD2VEC_MODEL_FILE
+        self.model = Word2Vec(
+                             min_count=config.WV_MIN_COUNT,
+                             window=config.WV_WINDOW,
+                             size=config.WV_SIZE,
+                             sample=config.WV_SAMPLE,
+                             alpha=config.WV_ALPHA,
+                             min_alpha=config.WV_MIN_ALPHA,
+                             negative=config.WV_NEGATIVE,
+                             workers=WORKERS,
+                             )
 
-        self.model.build_vocab(label_corpus,
-                               update=False,
-                               progress_per=1000,
-                               keep_raw_vocab=False,
-                               trim_rule=None,
+        self.model.build_vocab(
+                              label_corpus,
+                              update=False,
+                              progress_per=1000,
+                              keep_raw_vocab=False,
+                              trim_rule=None,
                               )
 
         print("\tVocabulary shape:", self.model.wv.vectors.shape)
@@ -76,7 +75,8 @@ class Word2VecModelGenerator():
         return label_corpus_alt
 
     def train(self):
-        self.model.train(self.label_corpus,
+        self.model.train(
+                        self.label_corpus,
                         total_examples=self.model.corpus_count,
                         total_words=None,
                         epochs=self.epochs,
@@ -112,12 +112,10 @@ class Word2VecModelGenerator():
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 3:
-        print("Usage: python {} <labels_file> <model_name>".format(sys.argv[0]))
+    if len(sys.argv) != 2:
+        print("Usage: python {} <labels_file>".format(sys.argv[0]))
         exit()
     LABELS_FILE = sys.argv[1]
-    MODEL_NAME = sys.argv[2]
-
 
     if not os.path.isfile(LABELS_FILE):
         print(LABELS_FILE, "not found. Exiting")
@@ -146,7 +144,7 @@ if __name__ == "__main__":
 
     ## Init Word2Vec model
     print("Initializing Word2Vec model..")
-    word2vec_master = Word2VecModelGenerator(label_corpus, MODEL_NAME, config)
+    word2vec_master = Word2VecModelGenerator(label_corpus, config)
 
     ## Train model
     print("Training model..")

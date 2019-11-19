@@ -10,7 +10,7 @@ python 2-split_labels.py ${OUTPUT_DIR}
 
 echo
 echo    Word2Vec started..
-python 3-word2vec.py ${OUTPUT_DIR}/train_labels.csv ${OUTPUT_DIR}
+python 3-word2vec.py ${OUTPUT_DIR}/train_labels.csv
 
 echo
 echo    Image stats are being extracted..
