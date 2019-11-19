@@ -10,8 +10,10 @@ class Config():
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data')
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
-        self.WORD2VEC_MODEL_FILE = os.path.join(self.MODEL_DIR, 'united_word2vec.model')
+        self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
+        self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, 'united_word2vec.model')
         self.MODEL_NAME = 'united'
+        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss'
 
         ## Shapes  !!! L X S = C x W x H !!!
         self.SENTENCE_LENGTH = 8
@@ -76,9 +78,10 @@ class Config():
 
         ## Hardware
         self.DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.N_WORKERS = 8
+        self.N_WORKERS = 4
         self.N_GPUS = 1
 
         ## Logging
         self.N_PRINT_BATCH = 200
+        self.N_LOG_BATCH = 200
         self.N_SAVE_MODEL_EPOCHS = 1

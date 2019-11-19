@@ -61,7 +61,9 @@ if __name__ == "__main__":
     ## Init model with G and D
     print("\nModel initializing..")
     model = GANModel(CONFIG, mode='train')
-    time.sleep(0.5)
+    model.init_model_dir()
+    print("Created", model.model_dir)
+    time.sleep(1.0)
 
     print("\nTraining starting..")
     for epoch in range(CONFIG.N_EPOCHS):
@@ -84,6 +86,8 @@ if __name__ == "__main__":
                 model.D.eval()
 
             for i, data in enumerate(data_loader):
+                iteration = epoch * n_batch + i
+
                 real_images, real_wv_tensor, fake_wv_tensor = data
                 batch_size = real_images.size()[0]
 
@@ -100,6 +104,10 @@ if __name__ == "__main__":
                 total_loss_g += loss_g
                 total_loss_d += loss_d
 
+                ## Save logs
+                if i % CONFIG.N_LOG_BATCH == 0:
+                    model.save_logs(phase, epoch, iteration, loss_g, loss_d)
+
                 # Print logs
                 if i % CONFIG.N_PRINT_BATCH == 0:
                     print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
@@ -112,7 +120,7 @@ if __name__ == "__main__":
 
         ## Save model
         if (epoch + 1) % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
-            model.save_model_dict(CONFIG.MODEL_NAME, epoch + 1, total_loss_g, total_loss_d)
+            model.save_model_dict(epoch + 1, total_loss_g, total_loss_d)
             
         # # Merge noisy input, ground truth and network output so that you can compare your results side by side
         # out = torch.cat([img, fake], dim=2).detach().cpu().clamp(0.0, 1.0)

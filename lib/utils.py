@@ -1,4 +1,5 @@
 from io import BytesIO, StringIO
+import uuid
 
 import torch
 import torch.nn as nn
@@ -121,3 +122,6 @@ class ImageUtilities(object):
     @staticmethod
     def image_random_resolution(ratio_range):
         return RandomResolution(ratio_range)
+
+def get_uuid():
+    return str(uuid.uuid4()).split('-')[-1]

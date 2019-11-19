@@ -4,7 +4,7 @@ import shutil
 import torch
 
 from .arch import Generator, Discriminator
-from .utils import GANLoss
+from .utils import GANLoss, get_uuid
 
 class GANModel(object):
 
@@ -13,6 +13,8 @@ class GANModel(object):
         self.config = config
         self.mode = mode
         self.device = config.DEVICE
+        self.model_name = config.MODEL_NAME
+        self.log_header = config.LOG_HEADER
 
         self.batch_size = config.BATCH_SIZE
         gan_loss = config.GAN_LOSS
@@ -42,9 +44,12 @@ class GANModel(object):
 
             self.networks.append(self.D)
 
-        ## Init losses
-        self.loss_G = 0.0
-        self.loss_D = 0.0
+        ## Init things (these will get values later) 
+        self.loss_G = None
+        self.loss_D = None
+        self.model_dir = None
+        self.train_log_file = None
+        self.val_log_file = None
 
         print(self.G)
         print(self.D)
@@ -103,17 +108,32 @@ class GANModel(object):
     def get_loss(self):
         return self.loss_G.item(), self.loss_D.item()
 
-    def save_model_dict(self, name, epoch, loss_g, loss_d):
-        model_dirname = "{}_{:04}_{:.4f}_{:.4f}".format(name, epoch, loss_g, loss_d)
+    def init_model_dir(self):
+        model_dirname = "{}_{}".format(self.model_name, get_uuid())
         model_dir = os.path.join(self.config.MODEL_DIR, model_dirname)
         os.makedirs(model_dir, exist_ok=True)
-        model_file = os.path.join(model_dir, self.config.MODEL_NAME + '.pth')
+        self.model_dir = model_dir
 
+        ## Copy lib/ tree
         old_lib_dir = os.path.join(self.config.BASE_DIR, 'lib')
         new_lib_dir = os.path.join(model_dir, 'lib')
         shutil.copytree(old_lib_dir, new_lib_dir)
 
-        loss_g, loss_d = self.get_loss()
+        ## Init log files
+        train_log_filename = self.model_name + '_train_log.csv'
+        val_log_filename = self.model_name + '_val_log.csv'
+        train_log_file = os.path.join(self.model_dir, train_log_filename)
+        val_log_file = os.path.join(self.model_dir, val_log_filename)
+        self.train_log_file = train_log_file
+        self.val_log_file = val_log_file
+        with open(train_log_file, 'w') as f:
+            f.write(self.log_header + '\n')
+        with open(val_log_file, 'w') as f:
+            f.write(self.log_header + '\n')
+
+    def save_model_dict(self, epoch, loss_g, loss_d):
+        model_filename = "{}_{:04}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, loss_g, loss_d)
+        model_file = os.path.join(self.model_dir, model_filename)
         save_dict = {
                     'g' : self.G.state_dict(), 
                     'g_optim' : self.G_optimizer.state_dict(),
@@ -121,6 +141,12 @@ class GANModel(object):
                     'd_optim' : self.D_optimizer.state_dict()
                     }
         torch.save(save_dict, model_file)
+
+    def save_logs(self, phase, epoch, iteration, loss_g, loss_d):
+        log_file = self.train_log_file if phase == 'train' else self.val_log_file
+        log_row_str = '{},{},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d)
+        with open(log_file, 'a') as f:
+            f.write(log_row_str)
 
     def fit(self, data, phase='train'):
         ## Data to device
