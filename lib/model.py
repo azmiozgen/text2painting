@@ -28,7 +28,6 @@ class GANModel(object):
 
         ## Init G and D
         self.G = Generator(config).to(self.device)
-        self.networks = [self.G]
 
         ## Init networks and optimizers
         if mode == 'train':
@@ -45,7 +44,18 @@ class GANModel(object):
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
 
-            self.networks.append(self.D)
+            self.G_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_optimizer, 
+                                                                             mode='min',
+                                                                             factor=0.5,
+                                                                             threshold=0.01,
+                                                                             patience=5)
+            
+            self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
+                                                                             mode='min',
+                                                                             factor=0.5,
+                                                                             threshold=0.01,
+                                                                             patience=5)
+
 
         ## Init things (these will get values later) 
         self.loss_G = None
@@ -111,6 +121,15 @@ class GANModel(object):
     def get_loss(self):
         return self.loss_G.item(), self.loss_D.item()
 
+    def update_lr(self):        
+        self.G_lr_scheduler.step(0)
+        self.D_lr_scheduler.step(0)
+        D_lr = self.G_optimizer.param_groups[0]['lr']
+        G_lr = self.D_optimizer.param_groups[0]['lr']
+
+        print('\t\t(G learning rate is {:.4E})'.format(G_lr))
+        print('\t\t(D learning rate is {:.4E})'.format(D_lr))
+
     def init_model_dir(self):
         model_dirname = "{}_{}".format(self.model_name, get_uuid())
         model_dir = os.path.join(self.config.MODEL_DIR, model_dirname)
@@ -140,8 +159,10 @@ class GANModel(object):
         save_dict = {
                     'g' : self.G.state_dict(), 
                     'g_optim' : self.G_optimizer.state_dict(),
+                    'g_lr_scheduler' : self.G_lr_scheduler.state_dict(),
                     'd' : self.D.state_dict(),
-                    'd_optim' : self.D_optimizer.state_dict()
+                    'd_optim' : self.D_optimizer.state_dict(),
+                    'd_lr_scheduler' : self.D_lr_scheduler.state_dict()
                     }
         torch.save(save_dict, model_file)
 
@@ -156,7 +177,7 @@ class GANModel(object):
         fake_images_tensor = self.forward(real_wv_tensor)
 
         images_bag = []
-        for i, (fake_image, real_image, real_wvs) in enumerate(zip(fake_images_tensor, real_images_tensor, real_wv_tensor)):
+        for fake_image, real_image, real_wvs in zip(fake_images_tensor, real_images_tensor, real_wv_tensor):
             words = []
 
             ## Get words from word vectors

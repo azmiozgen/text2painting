@@ -122,12 +122,15 @@ if __name__ == "__main__":
                         grid_img_pil = model.generate_grid(real_wv_tensor, real_images, train_dataset.word2vec_model)
                         model.save_output(grid_img_pil, output_filename)
                 except Exception as e:
-                    print(e, 'Passing.')
+                    print('Grid image output generation failed.', e, 'Passing.')
 
             total_loss_g /= n_batch
             total_loss_d /= n_batch
             print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
             print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
+
+        ## Update lr
+        model.update_lr()
 
         ## Save model
         if (epoch + 1) % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
