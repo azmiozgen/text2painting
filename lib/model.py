@@ -95,15 +95,15 @@ class GANModel(object):
     def backward_D(self, rr_pair, rf_pair, fr_pair):
         # Real-real
         pred_rr = self.D(rr_pair)
-        self.loss_D_rr = self.criterionGAN(pred_rr, target_is_real=True)
+        self.loss_D_rr, self.accuracy_D_rr = self.criterionGAN(pred_rr, target_is_real=True)
 
         ## Real-fake
         pred_rf = self.D(rf_pair)
-        self.loss_D_rf = self.criterionGAN(pred_rf, target_is_real=False)
+        self.loss_D_rf, self.accuracy_D_rf = self.criterionGAN(pred_rf, target_is_real=False)
 
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
-        self.loss_D_fr = self.criterionGAN(pred_fr, target_is_real=False)
+        self.loss_D_fr, self.accuracy_D_fr = self.criterionGAN(pred_fr, target_is_real=False)
 
         self.loss_D = self.loss_D_rr + self.loss_D_rf + 0.5 * self.loss_D_fr
         self.loss_D.backward()
@@ -112,7 +112,7 @@ class GANModel(object):
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
         
-        loss_G_GAN = self.criterionGAN(pred_fr, target_is_real=True)
+        loss_G_GAN, _ = self.criterionGAN(pred_fr, target_is_real=True)
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
         self.loss_G = loss_G_GAN + loss_G_L1
@@ -120,6 +120,9 @@ class GANModel(object):
 
     def get_loss(self):
         return self.loss_G.item(), self.loss_D.item()
+
+    def get_D_accuracy(self):
+        return (self.loss_D_rr, self.loss_D_rf, self.loss_D_fr)
 
     def update_lr(self):        
         self.G_lr_scheduler.step(0)
@@ -200,7 +203,7 @@ class GANModel(object):
             images_bag.extend([word_image, fake_image, real_image])
 
         images_bag = np.array(images_bag)
-        grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=6).permute(1, 2, 0)
+        grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=self.config.N_GRID_ROW).permute(1, 2, 0)
         grid_pil = Image.fromarray(np.array(grid * 255, dtype=np.uint8))
         return grid_pil
 

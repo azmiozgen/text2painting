@@ -9,7 +9,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
                          RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
-
+from lib.config import Config
 
 class GANLoss(nn.Module):
 
@@ -66,7 +66,11 @@ class GANLoss(nn.Module):
                 loss = -prediction.mean()
             else:
                 loss = prediction.mean()
-        return loss
+
+        _prediction = prediction.detach().cpu().numpy()
+        _target_tensor = target_tensor.detach().cpu().numpy()
+        accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
+        return loss, accuracy
 
 class ImageUtilities(object):
 
@@ -134,10 +138,17 @@ def get_uuid():
 def words2image(text_list, image_shapes=(64, 64)):
     w, h = image_shapes
 
+    config = Config()
     img = Image.fromarray(np.ones(image_shapes))
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype("Lato-Medium.ttf", 7)
-    
+
+    ## Look for fonts
+    for font in config.FONTS:
+        try:
+            font = ImageFont.truetype(font, 7)
+        except OSError:
+            continue
+
     x = int(w * 0.1)
     y0 = int(h * 0.01)
     for i, text in enumerate(text_list):

@@ -69,8 +69,11 @@ if __name__ == "__main__":
         print("Epoch {}/{}:".format(epoch + 1, CONFIG.N_EPOCHS))
         total_loss_g = 0.0
         total_loss_d = 0.0
+        total_acc_rr = 0.0
+        total_acc_rf = 0.0
+        total_acc_fr = 0.0
 
-        for phase in ['train', 'val']:
+        for phase in ['val']:
             phase_start = time.time()
             print("\t{} phase:".format(phase.title()))
             if phase == 'train':
@@ -100,11 +103,18 @@ if __name__ == "__main__":
                 # print("\nModel optimizing..")
                 model.fit(data, phase=phase)
 
-                # Update total loss
-                loss_g, loss_d = model.get_loss()
-                # loss_g, loss_d = -1.0, -1.0
+                ## Update total loss
+                # loss_g, loss_d = model.get_loss()
+                loss_g, loss_d = -1.0, -1.0
                 total_loss_g += loss_g
                 total_loss_d += loss_d
+
+                ## Get D accuracy
+                # acc_rr, acc_rf, acc_fr = model.get_D_accuracy()
+                acc_rr, acc_rf, acc_fr = 0.0, 0.0, 0.0
+                total_acc_rr += acc_rr
+                total_acc_rf += acc_rf
+                total_acc_fr += acc_fr
 
                 ## Save logs
                 if i % CONFIG.N_LOG_BATCH == 0:
@@ -113,7 +123,8 @@ if __name__ == "__main__":
                 # Print logs
                 if i % CONFIG.N_PRINT_BATCH == 0:
                     print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
-                    print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d))
+                    print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
+                    print("| Accuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(acc_rr, acc_rf, acc_fr))
 
                 ## Save visual outputs
                 try:
@@ -126,7 +137,11 @@ if __name__ == "__main__":
 
             total_loss_g /= n_batch
             total_loss_d /= n_batch
+            total_acc_rr /= n_batch
+            total_acc_rf /= n_batch
+            total_acc_fr /= n_batch
             print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
+            print("\t\tAccuracy D real-real: {:.4f} | real-fake {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
             print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
 
         ## Update lr

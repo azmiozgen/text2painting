@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'united'
+        SUBSET = 'united_small'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -72,7 +72,7 @@ class Config():
         self.LAMBDA_L1 = 1.0
 
         ## Hyper-params
-        self.BATCH_SIZE = 16
+        self.BATCH_SIZE = 2
         self.N_EPOCHS = 1
         self.LR = 2e-4
         self.BETA = 0.5
@@ -88,3 +88,7 @@ class Config():
         self.N_LOG_BATCH = 200
         self.N_SAVE_VISUALS_BATCH = 200
         self.N_SAVE_MODEL_EPOCHS = 1
+        self.N_GRID_ROW = 1
+
+        ## Misc
+        self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
