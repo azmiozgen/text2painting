@@ -14,7 +14,7 @@ class Config():
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
         self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, SUBSET + '_word2vec.model')
         self.MODEL_NAME = SUBSET
-        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss'
+        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,D_rr_acc,D_rf_acc,D_fr_acc'
 
         ## Shapes  !!! L X S = C x W x H !!!
         self.SENTENCE_LENGTH = 8
@@ -88,7 +88,7 @@ class Config():
         self.N_LOG_BATCH = 200
         self.N_SAVE_VISUALS_BATCH = 200
         self.N_SAVE_MODEL_EPOCHS = 1
-        self.N_GRID_ROW = 1
+        self.N_GRID_ROW = 3
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']

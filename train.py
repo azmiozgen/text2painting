@@ -1,3 +1,4 @@
+import argparse
 import glob
 import os
 import sys
@@ -8,11 +9,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from PIL import Image, ImageFilter
+
 import torch
 import torch.nn as nn
-
 from gensim.models import Word2Vec
-from lib.arch import Generator, Discriminator
+from lib.arch import Discriminator, Generator
 from lib.config import Config
 from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
 from lib.model import GANModel
@@ -20,12 +21,19 @@ from torch.utils.data import DataLoader
 
 CONFIG = Config()
 
+
+
 if __name__ == "__main__":
 
     ## Set GPU
     # os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
     # os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     # print("DEVICE:", torch.cuda.current_device())
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model', type=str, help='Model file to load')
+    args = parser.parse_args()
+    model_file = args.model
 
     ## Data loaders
     print("\nData loaders initializing..")
@@ -59,21 +67,19 @@ if __name__ == "__main__":
 
     ## Init model with G and D
     print("\nModel initializing..")
-    model = GANModel(CONFIG, mode='train')
-    model.init_model_dir()
-    print("Created", model.model_dir)
+    model = GANModel(CONFIG, model_file=model_file)
     time.sleep(1.0)
 
     print("\nTraining starting..")
-    for epoch in range(CONFIG.N_EPOCHS):
-        print("Epoch {}/{}:".format(epoch + 1, CONFIG.N_EPOCHS))
+    for epoch in range(model.epoch, model.epoch + CONFIG.N_EPOCHS):
+        print("Epoch {}/{}:".format(epoch + 1, model.epoch + CONFIG.N_EPOCHS))
         total_loss_g = 0.0
         total_loss_d = 0.0
         total_acc_rr = 0.0
         total_acc_rf = 0.0
         total_acc_fr = 0.0
 
-        for phase in ['val']:
+        for phase in ['train', 'val']:
             phase_start = time.time()
             print("\t{} phase:".format(phase.title()))
             if phase == 'train':
@@ -104,21 +110,22 @@ if __name__ == "__main__":
                 model.fit(data, phase=phase)
 
                 ## Update total loss
-                # loss_g, loss_d = model.get_loss()
-                loss_g, loss_d = -1.0, -1.0
+                loss_g, loss_d = model.get_loss()
+                # loss_g, loss_d = -1.0, -1.0
                 total_loss_g += loss_g
                 total_loss_d += loss_d
 
                 ## Get D accuracy
-                # acc_rr, acc_rf, acc_fr = model.get_D_accuracy()
-                acc_rr, acc_rf, acc_fr = 0.0, 0.0, 0.0
+                acc_rr, acc_rf, acc_fr = model.get_D_accuracy()
+                # acc_rr, acc_rf, acc_fr = 0.0, 0.0, 0.0
                 total_acc_rr += acc_rr
                 total_acc_rf += acc_rf
                 total_acc_fr += acc_fr
 
                 ## Save logs
                 if i % CONFIG.N_LOG_BATCH == 0:
-                    model.save_logs(phase, epoch, iteration, loss_g, loss_d)
+                    log_tuple = phase, epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr
+                    model.save_logs(log_tuple)
 
                 # Print logs
                 if i % CONFIG.N_PRINT_BATCH == 0:
@@ -150,4 +157,3 @@ if __name__ == "__main__":
         ## Save model
         if (epoch + 1) % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
             model.save_model_dict(epoch + 1, iteration, total_loss_g, total_loss_d)
-            

@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 
 import numpy as np
 from PIL import Image
@@ -11,8 +12,9 @@ from .utils import GANLoss, get_uuid, words2image, ImageUtilities
 
 class GANModel(object):
 
-    def __init__(self, config, mode='train'):
+    def __init__(self, config, model_file=None, mode='train'):
 
+        assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
         self.config = config
         self.mode = mode
         self.device = config.DEVICE
@@ -56,13 +58,32 @@ class GANModel(object):
                                                                              threshold=0.01,
                                                                              patience=5)
 
-
         ## Init things (these will get values later) 
+        self.state_dict = {
+                          'g' : None,
+                          'g_optim' : None,
+                          'g_lr_scheduler' : None,
+                          'd' : None,
+                          'd_optim' : None,
+                          'd_lr_scheduler' : None,
+                          'epoch' : None
+                          }
+        self.epoch = 0
         self.loss_G = None
         self.loss_D = None
         self.model_dir = None
         self.train_log_file = None
         self.val_log_file = None
+
+        if model_file:
+            self.load_state_dict(model_file)
+            self.set_model_dir(model_file)
+            print("{} loaded.".format(self.model_dir))
+        else:
+            self.set_state_dict()
+            self.set_model_dir()
+            print("{} created.".format(self.model_dir))
+        time.sleep(1.0)
 
         print(self.G)
         print(self.D)
@@ -74,6 +95,73 @@ class GANModel(object):
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
+
+    def load_state_dict(self, model_file):
+        state = torch.load(model_file)
+        self.G.load_state_dict(state['g'])
+        if self.mode == 'train':
+            self.G_optimizer.load_state_dict(state['g_optim'])
+            self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
+            self.D.load_state_dict(state['d'])
+            self.D_optimizer.load_state_dict(state['d_optim'])
+            self.D_lr_scheduler.load_state_dict(state['d_lr_scheduler'])
+            self.epoch = state['epoch']
+        self.set_state_dict()
+
+    def set_state_dict(self):
+        self.state_dict['g'] = self.G.state_dict()
+        if self.mode == 'train':
+            self.state_dict['g_optim'] = self.G_optimizer.state_dict()
+            self.state_dict['g_lr_scheduler'] = self.G_lr_scheduler.state_dict()
+            self.state_dict['d'] = self.D.state_dict()
+            self.state_dict['d_optim'] = self.D_optimizer.state_dict()
+            self.state_dict['d_lr_scheduler'] = self.D_lr_scheduler.state_dict()
+            self.state_dict['epoch'] = self.epoch
+
+    def save_model_dict(self, epoch, iteration, loss_g, loss_d):
+        model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
+        model_file = os.path.join(self.model_dir, model_filename)
+        self.epoch = epoch
+        self.set_state_dict()
+        torch.save(self.state_dict, model_file)
+
+    def set_model_dir(self, model_file=None):
+        if model_file:
+            model_dir = os.path.join(self.config.MODEL_DIR, os.path.basename(os.path.dirname(model_file)))
+        else:
+            model_dirname = "{}_{}".format(self.model_name, get_uuid())
+            model_dir = os.path.join(self.config.MODEL_DIR, model_dirname)
+            os.makedirs(model_dir, exist_ok=True)
+        self.model_dir = model_dir
+
+        ## Copy current lib/ tree
+        current_lib_dir = os.path.join(self.config.BASE_DIR, 'lib')
+        copy_lib_dir = os.path.join(model_dir, 'lib')
+        if os.path.isdir(copy_lib_dir):
+            shutil.rmtree(copy_lib_dir)
+        shutil.copytree(current_lib_dir, copy_lib_dir)
+
+        ## Init log files
+        train_log_filename = self.model_name + '_train_log.csv'
+        val_log_filename = self.model_name + '_val_log.csv'
+        train_log_file = os.path.join(self.model_dir, train_log_filename)
+        val_log_file = os.path.join(self.model_dir, val_log_filename)
+        self.train_log_file = train_log_file
+        self.val_log_file = val_log_file
+
+        ## Write headers if new model
+        if not model_file:
+            with open(train_log_file, 'w') as f:
+                f.write(self.log_header + '\n')
+            with open(val_log_file, 'w') as f:
+                f.write(self.log_header + '\n')
+
+    def save_logs(self, log_tuple):
+        phase, epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr = log_tuple
+        log_file = self.train_log_file if phase == 'train' else self.val_log_file
+        log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr)
+        with open(log_file, 'a') as f:
+            f.write(log_row_str)
 
     def set_requires_grad(self, net, requires_grad=False):
         for param in net.parameters():
@@ -133,47 +221,7 @@ class GANModel(object):
         print('\t\t(G learning rate is {:.4E})'.format(G_lr))
         print('\t\t(D learning rate is {:.4E})'.format(D_lr))
 
-    def init_model_dir(self):
-        model_dirname = "{}_{}".format(self.model_name, get_uuid())
-        model_dir = os.path.join(self.config.MODEL_DIR, model_dirname)
-        os.makedirs(model_dir, exist_ok=True)
-        self.model_dir = model_dir
 
-        ## Copy lib/ tree
-        old_lib_dir = os.path.join(self.config.BASE_DIR, 'lib')
-        new_lib_dir = os.path.join(model_dir, 'lib')
-        shutil.copytree(old_lib_dir, new_lib_dir)
-
-        ## Init log files
-        train_log_filename = self.model_name + '_train_log.csv'
-        val_log_filename = self.model_name + '_val_log.csv'
-        train_log_file = os.path.join(self.model_dir, train_log_filename)
-        val_log_file = os.path.join(self.model_dir, val_log_filename)
-        self.train_log_file = train_log_file
-        self.val_log_file = val_log_file
-        with open(train_log_file, 'w') as f:
-            f.write(self.log_header + '\n')
-        with open(val_log_file, 'w') as f:
-            f.write(self.log_header + '\n')
-
-    def save_model_dict(self, epoch, iteration, loss_g, loss_d):
-        model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
-        model_file = os.path.join(self.model_dir, model_filename)
-        save_dict = {
-                    'g' : self.G.state_dict(), 
-                    'g_optim' : self.G_optimizer.state_dict(),
-                    'g_lr_scheduler' : self.G_lr_scheduler.state_dict(),
-                    'd' : self.D.state_dict(),
-                    'd_optim' : self.D_optimizer.state_dict(),
-                    'd_lr_scheduler' : self.D_lr_scheduler.state_dict()
-                    }
-        torch.save(save_dict, model_file)
-
-    def save_logs(self, phase, epoch, iteration, loss_g, loss_d):
-        log_file = self.train_log_file if phase == 'train' else self.val_log_file
-        log_row_str = '{},{},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d)
-        with open(log_file, 'a') as f:
-            f.write(log_row_str)
 
     def generate_grid(self, real_wv_tensor, real_images_tensor, word2vec_model):
         ## Generate fake image
