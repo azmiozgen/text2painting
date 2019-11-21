@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'united_small'
+        SUBSET = 'united'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -17,23 +17,23 @@ class Config():
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,D_rr_acc,D_rf_acc,D_fr_acc'
 
         ## Shapes  !!! L X S = C x W x H !!!
-        self.SENTENCE_LENGTH = 8
-        self.WV_SIZE = 1536
-        self.IMAGE_SIZE_WIDTH = 64
-        self.IMAGE_SIZE_HEIGHT = 64
+        self.SENTENCE_LENGTH = 16  # 16
+        self.WV_SIZE = 768  # 3072
+        self.IMAGE_SIZE_WIDTH = 64  ## 128
+        self.IMAGE_SIZE_HEIGHT = 64  ## 128
         self.N_CHANNELS = 3
         assert self.SENTENCE_LENGTH * self.WV_SIZE == self.N_CHANNELS * self.IMAGE_SIZE_WIDTH * self.IMAGE_SIZE_HEIGHT, \
                "Incompatible shapes {} x {} != {} x {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, self.N_CHANNELS, \
                                                                     self.IMAGE_SIZE_WIDTH, self.IMAGE_SIZE_HEIGHT)
 
         ## Stats (Change w.r.t stats file under data/)
-        self.MEAN = [0.5393, 0.5967, 0.2886]
-        self.STD = [0.3146, 0.4590, 0.1506]
+        self.MEAN = [0.2085, 0.3912, 0.4920]
+        self.STD = [0.1383, 0.2215, 0.2465]
 
         ## Word2Vec
         self.WV_MIN_COUNT = 5       ## Ignores all words with total frequency lower than this.
         self.WV_WINDOW = 12         ## Maximum distance between the current and predicted word within a sentence.
-        # self.WV_SIZE              ## Dimensionality of the word vectors. ## TODO
+        # self.WV_SIZE              ## Dimensionality of the word vectors.
         self.WV_SAMPLE = 1e-4       ## The threshold for configuring which higher-frequency words are randomly downsampled. EFFECTIVE!
         self.WV_ALPHA = 1e-2        ## Initial learning rate
         self.WV_MIN_ALPHA = 1e-5    ## Minimum learning rate
@@ -46,8 +46,8 @@ class Config():
         self.SHUFFLE_GROUPS = True
         self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
         self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
-        # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
-        self.GROUP_HEIGHT_RANGES = [-1, 100000]
+        self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
         self.HORIZONTAL_FLIPPING = False
@@ -67,13 +67,15 @@ class Config():
         ## GAN options
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
         self.NGF = 64
+        # self.NGF = 32
         self.NDF = 64
+        # self.NDF = 32
         self.GAN_LOSS = 'vanilla'   ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.LAMBDA_L1 = 1.0
+        self.LAMBDA_L1 = 10.0
 
         ## Hyper-params
-        self.BATCH_SIZE = 2
-        self.N_EPOCHS = 1
+        self.BATCH_SIZE = 64
+        self.N_EPOCHS = 40
         self.LR = 2e-4
         self.BETA = 0.5
         self.WEIGHT_DECAY = 1e-4
@@ -87,8 +89,8 @@ class Config():
         self.N_PRINT_BATCH = 200
         self.N_LOG_BATCH = 200
         self.N_SAVE_VISUALS_BATCH = 200
-        self.N_SAVE_MODEL_EPOCHS = 1
-        self.N_GRID_ROW = 3
+        self.N_SAVE_MODEL_EPOCHS = 4
+        self.N_GRID_ROW = 6
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']

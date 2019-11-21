@@ -45,22 +45,26 @@ class GANLoss(nn.Module):
         """
 
         if target_is_real:
-            target_tensor = self.real_label
+            target_tensor = self.real_label.expand_as(prediction)
+            target_tensor_smooth = target_tensor.detach().cpu() - torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
         else:
-            target_tensor = self.fake_label
-        return target_tensor.expand_as(prediction)
+            target_tensor = self.fake_label.expand_as(prediction)
+            target_tensor_smooth = target_tensor.detach().cpu() + torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+        return target_tensor, target_tensor_smooth
 
     def __call__(self, prediction, target_is_real):
         """Calculate loss given Discriminator's output and grount truth labels.
         Parameters:
-            prediction (tensor) - - tpyically the prediction output from a discriminator
+            prediction (tensor) - - typically the prediction output from a discriminator
             target_is_real (bool) - - if the ground truth label is for real images or fake images
         Returns:
             the calculated loss.
         """
         if self.gan_mode in ['lsgan', 'vanilla']:
-            target_tensor = self.get_target_tensor(prediction, target_is_real)
-            loss = self.loss(prediction, target_tensor)
+            target_tensor, target_tensor_smooth = self.get_target_tensor(prediction, target_is_real)
+            if torch.cuda.is_available():
+                target_tensor_smooth = target_tensor_smooth.to('cuda')
+            loss = self.loss(prediction, target_tensor_smooth)
         elif self.gan_mode == 'wgangp':
             if target_is_real:
                 loss = -prediction.mean()
@@ -69,7 +73,10 @@ class GANLoss(nn.Module):
 
         _prediction = prediction.detach().cpu().numpy()
         _target_tensor = target_tensor.detach().cpu().numpy()
-        accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
+        if target_is_real:
+            accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
+        else:
+            accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
         return loss, accuracy
 
 class ImageUtilities(object):
@@ -135,24 +142,29 @@ class ImageUtilities(object):
 def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
 
-def words2image(text_list, image_shapes=(64, 64)):
-    w, h = image_shapes
-
+def words2image(text_list):
     config = Config()
-    img = Image.fromarray(np.ones(image_shapes))
+
+    w = config.IMAGE_SIZE_WIDTH
+    h = config.IMAGE_SIZE_HEIGHT
+
+    img = Image.fromarray(np.ones((h, w)))
     draw = ImageDraw.Draw(img)
 
     ## Look for fonts
     for font in config.FONTS:
         try:
-            font = ImageFont.truetype(font, 7)
+            font = ImageFont.truetype(font, 6)
         except OSError:
             continue
 
-    x = int(w * 0.1)
+    x1 = int(w * 0.05)
+    x2 = int(w * 0.55)
     y0 = int(h * 0.01)
+    word_height = h // len(text_list) * 2
     for i, text in enumerate(text_list):
-        y = i * len(text_list) + y0
+        y = (i // 2) * word_height + y0 if i % 2 == 0 else (i - 1) // 2 * word_height + y0
+        x = x1 if i % 2 == 0 else x2
         draw.text((x, y), text, 0, font=font)
 
     return np.array(img.convert('RGB'))

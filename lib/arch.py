@@ -22,6 +22,7 @@ def upsample_block(in_planes, out_planes):
                          nn.Upsample(scale_factor=2, mode='nearest'),
                          conv3x3(in_planes, out_planes),
                          nn.BatchNorm2d(out_planes),
+                        #  nn.InstanceNorm2d(out_planes),
                          nn.ReLU(True)
                          )
 
@@ -62,26 +63,31 @@ class Generator(nn.Module):
         self.fc = nn.Sequential(
                                nn.Linear(n_input, ngf * 4 * 4, bias=False),
                                nn.BatchNorm1d(ngf * 4 * 4),
+                            #    nn.InstanceNorm1d(ngf * 4 * 4),
                                nn.ReLU(True)
-                               )                                 # -> ngf x 4 x 4
+                               )                                 # -> ngf x H x W
 
-        self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x 4 x 4 -> ngf/2 x 8 x 8
-        self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 16 x 16
-        self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 32 x 32
-        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 64 x 64
+        self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x H x W -> ngf/2 x 2H x 2W
+        self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
+        self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
+        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+
+        self.dropout = nn.Dropout2d(0.5)
 
         self.image = nn.Sequential(
                                   conv3x3(ngf // 16, n_channel),
                                   nn.Tanh()
-                                  )                              # -> 3 x 64 x 64
+                                  )                              # -> 3 x 16H x 16W
 
     def forward(self, word_vectors):
+        # out = self.dropout(word_vectors)
         out = self.fc(word_vectors)
         out = out.view(-1, self.ngf, 4, 4)
         out = self.upsample1(out)
         out = self.upsample2(out)
         out = self.upsample3(out)
         out = self.upsample4(out)
+        out = self.dropout(out)
         out = self.image(out)
 
         return out
@@ -100,13 +106,17 @@ class Discriminator(nn.Module):
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4
                                  nn.BatchNorm2d(ndf * 2),
+                                #  nn.InstanceNorm2d(ndf * 2),
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
                                  nn.BatchNorm2d(ndf * 4),
+                                #  nn.InstanceNorm2d(ndf * 4),
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
                                  nn.BatchNorm2d(ndf * 8),
-                                 nn.LeakyReLU(0.2, inplace=True)
+                                #  nn.InstanceNorm2d(ndf * 8),
+                                 nn.LeakyReLU(0.2, inplace=True),
+                                #  nn.Dropout2d(0.5, True),
                                  )
 
         self.get_cond_logits = DiscriminatorLogits(ndf, ngf, bcondition=False)
@@ -128,12 +138,15 @@ class DiscriminatorLogits(nn.Module):
             self.outlogits = nn.Sequential(
                                           conv3x3(ndf * 8 + ngf, ndf * 8),
                                           nn.BatchNorm2d(ndf * 8),
+                                        #   nn.InstanceNorm2d(ndf * 8),
                                           nn.LeakyReLU(0.2, inplace=True),
+                                        #   nn.Dropout2d(0.5, True),
                                           nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
                                           nn.Sigmoid()
                                           )
         else:
             self.outlogits = nn.Sequential(
+                                        #   nn.Dropout2d(0.5, True),
                                           nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
                                           nn.Sigmoid()
                                           )

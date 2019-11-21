@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 import os
 import shutil
 import time
@@ -10,7 +11,75 @@ from torchvision.utils import make_grid
 from .arch import Generator, Discriminator
 from .utils import GANLoss, get_uuid, words2image, ImageUtilities
 
-class GANModel(object):
+class BaseModel(ABC):
+
+    def __init__(self, config, model_file=None, mode='train'):
+
+        assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
+        self.config = config
+        self.mode = mode
+        self.device = config.DEVICE
+        self.model_name = config.MODEL_NAME
+        self.log_header = config.LOG_HEADER
+
+        self.batch_size = config.BATCH_SIZE
+        gan_loss = config.GAN_LOSS
+        lr = config.LR
+        beta = config.BETA
+        weight_decay = config.WEIGHT_DECAY
+        self.lambda_l1 = config.LAMBDA_L1
+
+        self.state_dict = {
+                          'g' : None,
+                          'g_optim' : None,
+                          'g_lr_scheduler' : None,
+                          'd' : None,
+                          'd_optim' : None,
+                          'd_lr_scheduler' : None,
+                          'epoch' : None
+                          }
+        self.epoch = 0
+        self.loss_G = None
+        self.loss_D = None
+        self.model_dir = None
+        self.train_log_file = None
+        self.val_log_file = None
+
+    @abstractmethod
+    def load_state_dict(self, model_file):
+        pass
+    @abstractmethod
+    def set_state_dict(self):
+        pass
+    @abstractmethod
+    def save_model_dict(self, epoch, iteration, loss_g, loss_d):
+        pass
+    @abstractmethod
+    def set_model_dir(self, model_file=None):
+        pass
+    @abstractmethod
+    def save_logs(self, log_tuple):
+        pass
+    @abstractmethod
+    def set_requires_grad(self, net, requires_grad=False):
+        pass
+    @abstractmethod
+    def get_loss(self):
+        pass
+    @abstractmethod
+    def get_D_accuracy(self):
+        pass
+    @abstractmethod
+    def update_lr(self):
+        pass
+    @abstractmethod
+    def forward(self, real_wv_tensor):
+        pass
+    @abstractmethod
+    def fit(self, data, phase='train'):
+        pass
+
+class GANModel(BaseModel):
 
     def __init__(self, config, model_file=None, mode='train'):
 
@@ -57,6 +126,10 @@ class GANModel(object):
                                                                              factor=0.5,
                                                                              threshold=0.01,
                                                                              patience=5)
+
+        if torch.cuda.device_count() > 1:
+            self.G = torch.nn.DataParallel(self.G)
+            self.D = torch.nn.DataParallel(self.D)
 
         ## Init things (these will get values later) 
         self.state_dict = {
@@ -220,8 +293,6 @@ class GANModel(object):
 
         print('\t\t(G learning rate is {:.4E})'.format(G_lr))
         print('\t\t(D learning rate is {:.4E})'.format(D_lr))
-
-
 
     def generate_grid(self, real_wv_tensor, real_images_tensor, word2vec_model):
         ## Generate fake image

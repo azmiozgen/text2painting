@@ -11,7 +11,7 @@ from PIL import Image
 if __name__ == '__main__':
 
     SUBSET_LIST = ['deviantart', 'wikiart']
-    FRACTION = 0.1  ## To prepare smaller dataset, make 1.0 to take all
+    FRACTION = 1.0  ## To prepare smaller dataset, make 1.0 to take all
 
     if len(sys.argv) != 2:
         print("Usage: python {} <output_dir>".format(sys.argv[0]))
