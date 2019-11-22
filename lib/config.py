@@ -61,7 +61,8 @@ class Config():
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
         self.WORD_VECTORS_SIMILAR_PAD = True
-        self.WORD_VECTORS_SIMILAR_PAD_TOPN = 10
+        self.WORD_VECTORS_SIMILAR_PAD_TOPN = 2
+        self.WORD_VECTORS_SIMILAR_TAKE_SELF = True
         self.WORD_VECTORS_DISSIMILAR_TOPN = 10
 
         ## GAN options
@@ -89,8 +90,9 @@ class Config():
         self.N_PRINT_BATCH = 200
         self.N_LOG_BATCH = 200
         self.N_SAVE_VISUALS_BATCH = 200
-        self.N_SAVE_MODEL_EPOCHS = 4
+        self.N_SAVE_MODEL_EPOCHS = 1
         self.N_GRID_ROW = 6
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
+        self.WORDS2IMAGE_N_COLUMN = 1

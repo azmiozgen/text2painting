@@ -146,6 +146,7 @@ class AlignCollate(object):
         self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
         self.word_vectors_similar_pad = config.WORD_VECTORS_SIMILAR_PAD
         self.word_vectors_similar_pad_topN = config.WORD_VECTORS_SIMILAR_PAD_TOPN
+        self.word_vectors_similar_take_self = config.WORD_VECTORS_SIMILAR_TAKE_SELF
         self.word_vectors_dissimilar_topN = config.WORD_VECTORS_DISSIMILAR_TOPN
 
         if self._mode == 'train':
@@ -227,7 +228,10 @@ class AlignCollate(object):
         word_vector = np.array(word_vector)
         _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, 
                                                                       topn=self.word_vectors_similar_pad_topN + 1)
-        top_similar_words = np.array(_top_similar_words)[1:]   ## Do not take word itself (the most similar)
+        if self.word_vectors_similar_take_self:
+            top_similar_words = np.array(_top_similar_words)
+        else:
+            top_similar_words = np.array(_top_similar_words)[1:]   ## Do not take word itself (the most similar)
         try:
             similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
         except ValueError:
