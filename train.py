@@ -32,8 +32,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, help='Model file to load')
+    parser.add_argument('--reset_lr', action='store_true', help='Reset learning rate')
     args = parser.parse_args()
     model_file = args.model
+    reset_lr = args.reset_lr
 
     ## Data loaders
     print("\nData loaders initializing..")
@@ -67,12 +69,12 @@ if __name__ == "__main__":
 
     ## Init model with G and D
     print("\nModel initializing..")
-    model = GANModel(CONFIG, model_file=model_file)
+    model = GANModel(CONFIG, model_file=model_file, mode='train', reset_lr=reset_lr)
     time.sleep(1.0)
 
     print("\nTraining starting..")
     for epoch in range(model.epoch, model.epoch + CONFIG.N_EPOCHS):
-        print("Epoch {}/{}:".format(epoch + 1, model.epoch + CONFIG.N_EPOCHS))
+        print("Epoch {}/{}:".format(epoch, model.epoch + CONFIG.N_EPOCHS - 1))
         total_loss_g = 0.0
         total_loss_d = 0.0
         total_acc_rr = 0.0
@@ -155,5 +157,5 @@ if __name__ == "__main__":
         model.update_lr()
 
         ## Save model
-        if (epoch + 1) % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
-            model.save_model_dict(epoch + 1, iteration, total_loss_g, total_loss_d)
+        if epoch % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
+            model.save_model_dict(epoch, iteration, total_loss_g, total_loss_d)
