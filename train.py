@@ -33,9 +33,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, help='Model file to load')
     parser.add_argument('--reset_lr', action='store_true', help='Reset learning rate')
+    parser.add_argument('--accuracy', action='store_true', help='Compute accuracy (not recommended)')
     args = parser.parse_args()
     model_file = args.model
     reset_lr = args.reset_lr
+    accuracy = args.accuracy
 
     ## Data loaders
     print("\nData loaders initializing..")
@@ -69,7 +71,7 @@ if __name__ == "__main__":
 
     ## Init model with G and D
     print("\nModel initializing..")
-    model = GANModel(CONFIG, model_file=model_file, mode='train', reset_lr=reset_lr)
+    model = GANModel(CONFIG, model_file=model_file, mode='train', reset_lr=reset_lr, accuracy=accuracy)
     time.sleep(1.0)
 
     print("\nTraining starting..")
@@ -77,9 +79,12 @@ if __name__ == "__main__":
         print("Epoch {}/{}:".format(epoch, model.epoch + CONFIG.N_EPOCHS - 1))
         total_loss_g = 0.0
         total_loss_d = 0.0
-        total_acc_rr = 0.0
-        total_acc_rf = 0.0
-        total_acc_fr = 0.0
+        total_loss_gp_fr = 0.0
+        total_loss_gp_rf = 0.0
+        if accuracy:
+            total_acc_rr = 0.0
+            total_acc_rf = 0.0
+            total_acc_fr = 0.0
 
         for phase in ['train', 'val']:
             phase_start = time.time()
@@ -98,7 +103,7 @@ if __name__ == "__main__":
                 model.D.eval()
 
             for i, data in enumerate(data_loader):
-                iteration = epoch * n_batch + i
+                iteration = (epoch - 1) * n_batch + i
 
                 real_images, real_wv_tensor, fake_wv_tensor = data
                 batch_size = real_images.size()[0]
@@ -112,20 +117,24 @@ if __name__ == "__main__":
                 model.fit(data, phase=phase)
 
                 ## Update total loss
-                loss_g, loss_d = model.get_loss()
+                loss_g, loss_d, loss_gp_fr, loss_gp_rf = model.get_losses()
                 # loss_g, loss_d = -1.0, -1.0
                 total_loss_g += loss_g
                 total_loss_d += loss_d
+                if loss_gp_fr:
+                    total_loss_gp_fr += loss_gp_fr
+                if loss_gp_rf:
+                    total_loss_gp_rf += loss_gp_rf
 
                 ## Get D accuracy
                 acc_rr, acc_rf, acc_fr = model.get_D_accuracy()
-                # acc_rr, acc_rf, acc_fr = 0.0, 0.0, 0.0
-                total_acc_rr += acc_rr
-                total_acc_rf += acc_rf
-                total_acc_fr += acc_fr
+                if accuracy:
+                    total_acc_rr += acc_rr
+                    total_acc_rf += acc_rf
+                    total_acc_fr += acc_fr
 
                 ## Save logs
-                if i % CONFIG.N_LOG_BATCH == 0:
+                if iteration % CONFIG.N_LOG_BATCH == 0:
                     log_tuple = phase, epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr
                     model.save_logs(log_tuple)
 
@@ -133,24 +142,36 @@ if __name__ == "__main__":
                 if i % CONFIG.N_PRINT_BATCH == 0:
                     print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
                     print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
+                    if CONFIG.GAN_LOSS == 'wgangp':
+                        print("| GP loss fake-real: {:.4f}".format(loss_gp_fr), end=' ')
+                        print("| GP loss real-fake: {:.4f}".format(loss_gp_rf), end=' ')
                     print("| Accuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(acc_rr, acc_rf, acc_fr))
 
                 ## Save visual outputs
                 try:
-                    if i % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
+                    if iteration % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
                         output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
                         grid_img_pil = model.generate_grid(real_wv_tensor, real_images, train_dataset.word2vec_model)
                         model.save_output(grid_img_pil, output_filename)
                 except Exception as e:
-                    print('Grid image output generation failed.', e, 'Passing.')
+                    print('Grid image generation failed.', e, 'Passing.')
 
             total_loss_g /= n_batch
             total_loss_d /= n_batch
-            total_acc_rr /= n_batch
-            total_acc_rf /= n_batch
-            total_acc_fr /= n_batch
-            print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
-            print("\t\tAccuracy D real-real: {:.4f} | real-fake {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
+            total_loss_gp_fr /= n_batch
+            total_loss_gp_rf /= n_batch
+            if accuracy:
+                total_acc_rr /= n_batch
+                total_acc_rf /= n_batch
+                total_acc_fr /= n_batch
+            if CONFIG.GAN_LOSS == 'wgangp':
+                print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
+                print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')
+                print("| GP loss real-fake: {:.4f}".format(total_loss_gp_rf))
+            else:
+                print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
+            if accuracy:
+                print("\t\tAccuracy D real-real: {:.4f} | real-fake {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
             print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
 
         ## Update lr

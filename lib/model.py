@@ -9,7 +9,7 @@ import torch
 from torchvision.utils import make_grid
 
 from .arch import Generator, Discriminator
-from .utils import GANLoss, get_uuid, words2image, ImageUtilities
+from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities
 
 class BaseModel(ABC):
 
@@ -64,7 +64,7 @@ class BaseModel(ABC):
     def set_requires_grad(self, net, requires_grad=False):
         pass
     @abstractmethod
-    def get_loss(self):
+    def get_losses(self):
         pass
     @abstractmethod
     def get_D_accuracy(self):
@@ -81,18 +81,19 @@ class BaseModel(ABC):
 
 class GANModel(BaseModel):
 
-    def __init__(self, config, model_file=None, mode='train', reset_lr=False):
+    def __init__(self, config, model_file=None, mode='train', reset_lr=False, accuracy=False):
 
         assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
         self.config = config
         self.mode = mode
         self.reset_lr = reset_lr
+        self.accuracy = accuracy
         self.device = config.DEVICE
         self.model_name = config.MODEL_NAME
         self.log_header = config.LOG_HEADER
 
         self.batch_size = config.BATCH_SIZE
-        gan_loss = config.GAN_LOSS
+        self.gan_loss = config.GAN_LOSS
         lr = config.LR
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
@@ -105,7 +106,7 @@ class GANModel(BaseModel):
         if mode == 'train':
             self.D = Discriminator(config).to(self.device)
 
-            self.criterionGAN = GANLoss(gan_loss).to(self.device)
+            self.criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=accuracy).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
             self.G_optimizer = torch.optim.Adam(self.G.parameters(),
                                                 lr=lr,
@@ -120,13 +121,13 @@ class GANModel(BaseModel):
                                                                              mode='min',
                                                                              factor=0.5,
                                                                              threshold=0.01,
-                                                                             patience=5)
+                                                                             patience=10)
             
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
                                                                              factor=0.5,
                                                                              threshold=0.01,
-                                                                             patience=5)
+                                                                             patience=10)
 
         if torch.cuda.device_count() > 1:
             self.G = torch.nn.DataParallel(self.G)
@@ -140,11 +141,15 @@ class GANModel(BaseModel):
                           'd' : None,
                           'd_optim' : None,
                           'd_lr_scheduler' : None,
-                          'epoch' : None
                           }
         self.epoch = 1
         self.loss_G = None
         self.loss_D = None
+        self.loss_gp_fr = None
+        self.loss_gp_rf = None
+        self.accuracy_D_rr = 0.0
+        self.accuracy_D_rf = 0.0
+        self.accuracy_D_fr = 0.0
         self.model_dir = None
         self.train_log_file = None
         self.val_log_file = None
@@ -164,13 +169,16 @@ class GANModel(BaseModel):
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
-        print("\tGAN loss:", gan_loss)
+        print("\tGAN loss:", self.gan_loss)
         print("\tLearning rates (G, D):", self.G_optimizer.param_groups[0]['lr'], self.D_optimizer.param_groups[0]['lr'])
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
 
     def load_state_dict(self, model_file):
+        ## Get epoch
+        self.epoch = int(os.path.basename(model_file).split('_')[1]) + 1
+
         state = torch.load(model_file)
         self.G.load_state_dict(state['g'])
         if self.mode == 'train':
@@ -179,7 +187,6 @@ class GANModel(BaseModel):
             self.D_optimizer.load_state_dict(state['d_optim'])
             self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
             self.D_lr_scheduler.load_state_dict(state['d_lr_scheduler'])
-            self.epoch = state['epoch']
         if self.reset_lr:
             self.G_optimizer.param_groups[0]['lr'] = self.config.LR
             self.D_optimizer.param_groups[0]['lr'] = self.config.LR
@@ -193,12 +200,10 @@ class GANModel(BaseModel):
             self.state_dict['d'] = self.D.state_dict()
             self.state_dict['d_optim'] = self.D_optimizer.state_dict()
             self.state_dict['d_lr_scheduler'] = self.D_lr_scheduler.state_dict()
-            self.state_dict['epoch'] = self.epoch
 
     def save_model_dict(self, epoch, iteration, loss_g, loss_d):
         model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
         model_file = os.path.join(self.model_dir, model_filename)
-        self.epoch = epoch
         self.set_state_dict()
         torch.save(self.state_dict, model_file)
 
@@ -270,6 +275,14 @@ class GANModel(BaseModel):
         pred_fr = self.D(fr_pair.detach())
         self.loss_D_fr, self.accuracy_D_fr = self.criterionGAN(pred_fr, target_is_real=False)
 
+        if self.gan_loss == 'wgangp':
+            self.loss_gp_fr, _ = get_gradient_penalty(self.D, rr_pair, fr_pair.detach(), self.device,
+                                                   type='mixed', constant=1.0, lambda_gp=10.0)
+            self.loss_gp_rf, _ = get_gradient_penalty(self.D, rr_pair, rf_pair.detach(), self.device,
+                                                   type='mixed', constant=1.0, lambda_gp=10.0)
+            self.loss_gp_fr.backward(retain_graph=True)
+            self.loss_gp_rf.backward(retain_graph=True)
+
         self.loss_D = self.loss_D_rr + self.loss_D_rf + 0.5 * self.loss_D_fr
         self.loss_D.backward()
 
@@ -283,13 +296,17 @@ class GANModel(BaseModel):
         self.loss_G = loss_G_GAN + loss_G_L1
         self.loss_G.backward()
 
-    def get_loss(self):
-        return self.loss_G.item(), self.loss_D.item()
+    def get_losses(self):
+        loss_g = self.loss_G.item() if self.loss_G else -1.0
+        loss_d = self.loss_D.item() if self.loss_D else -1.0
+        loss_gp_fr = self.loss_gp_fr.item() if self.loss_gp_fr else -1.0
+        loss_gp_rf = self.loss_gp_rf.item() if self.loss_gp_rf else -1.0
+        return loss_g, loss_d, loss_gp_fr, loss_gp_rf
 
     def get_D_accuracy(self):
-        return (self.loss_D_rr, self.loss_D_rf, self.loss_D_fr)
+        return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr)
 
-    def update_lr(self):        
+    def update_lr(self):
         self.G_lr_scheduler.step(0)
         self.D_lr_scheduler.step(0)
         D_lr = self.G_optimizer.param_groups[0]['lr']

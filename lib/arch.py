@@ -92,6 +92,7 @@ class Generator(nn.Module):
 
         return out
 
+### DO NOT USE BatchNorm in D if WGANGP is used as loss function ###
 class Discriminator(nn.Module):
     def __init__(self, config):
         super(Discriminator, self).__init__()

@@ -71,12 +71,12 @@ class Config():
         # self.NGF = 32
         self.NDF = 64
         # self.NDF = 32
-        self.GAN_LOSS = 'vanilla'   ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.GAN_LOSS = 'wgangp'   ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 10.0
 
         ## Hyper-params
         self.BATCH_SIZE = 64
-        self.N_EPOCHS = 40
+        self.N_EPOCHS = 100
         self.LR = 2e-4
         self.BETA = 0.5
         self.WEIGHT_DECAY = 1e-4
@@ -87,8 +87,8 @@ class Config():
         self.N_GPUS = 1
 
         ## Logging
-        self.N_PRINT_BATCH = 200
-        self.N_LOG_BATCH = 200
+        self.N_PRINT_BATCH = 50
+        self.N_LOG_BATCH = 100
         self.N_SAVE_VISUALS_BATCH = 200
         self.N_SAVE_MODEL_EPOCHS = 1
         self.N_GRID_ROW = 6
