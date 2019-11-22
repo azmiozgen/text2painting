@@ -15,10 +15,6 @@ class GANLoss(nn.Module):
 
     def __init__(self, gan_mode, target_real_label=1.0, target_fake_label=0.0):
         """ Initialize the GANLoss class.
-        Parameters:
-            gan_mode (str) - - the type of GAN objective. It currently supports vanilla, lsgan, and wgangp.
-            target_real_label (bool) - - label for a real image
-            target_fake_label (bool) - - label of a fake image
         Note: Do not use sigmoid as the last layer of Discriminator.
         LSGAN needs no sigmoid. vanilla GANs will handle it with BCEWithLogitsLoss.
         """
@@ -36,13 +32,6 @@ class GANLoss(nn.Module):
             raise NotImplementedError('gan mode %s not implemented' % gan_mode)
 
     def get_target_tensor(self, prediction, target_is_real):
-        """Create label tensors with the same size as the input.
-        Parameters:
-            prediction (tensor) - - tpyically the prediction from a discriminator
-            target_is_real (bool) - - if the ground truth label is for real images or fake images
-        Returns:
-            A label tensor filled with ground truth label, and with the size of the input
-        """
 
         if target_is_real:
             target_tensor = self.real_label.expand_as(prediction)
@@ -53,13 +42,7 @@ class GANLoss(nn.Module):
         return target_tensor, target_tensor_smooth
 
     def __call__(self, prediction, target_is_real):
-        """Calculate loss given Discriminator's output and grount truth labels.
-        Parameters:
-            prediction (tensor) - - typically the prediction output from a discriminator
-            target_is_real (bool) - - if the ground truth label is for real images or fake images
-        Returns:
-            the calculated loss.
-        """
+
         if self.gan_mode in ['lsgan', 'vanilla']:
             target_tensor, target_tensor_smooth = self.get_target_tensor(prediction, target_is_real)
             if torch.cuda.is_available():
@@ -142,11 +125,11 @@ class ImageUtilities(object):
 def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
 
-def words2image(text_list):
-    config = Config()
+def words2image(text_list, config):
 
     w = config.IMAGE_SIZE_WIDTH
     h = config.IMAGE_SIZE_HEIGHT
+    n_column = config.WORDS2IMAGE_N_COLUMN
 
     img = Image.fromarray(np.ones((h, w)))
     draw = ImageDraw.Draw(img)
@@ -154,17 +137,33 @@ def words2image(text_list):
     ## Look for fonts
     for font in config.FONTS:
         try:
-            font = ImageFont.truetype(font, 6)
+            font = ImageFont.truetype(font, 9)
         except OSError:
             continue
+    
+    if n_column == 1:
+        
+        x0 = int(w * 0.001)
+        y0 = int(h * 0.001)
+        word_height = h // len(text_list)
+        for i, text in enumerate(text_list):
+            y = i * word_height + y0
+            x = x0
+            draw.text((x, y), text, 0, font=font)
 
-    x1 = int(w * 0.05)
-    x2 = int(w * 0.55)
-    y0 = int(h * 0.01)
-    word_height = h // len(text_list) * 2
-    for i, text in enumerate(text_list):
-        y = (i // 2) * word_height + y0 if i % 2 == 0 else (i - 1) // 2 * word_height + y0
-        x = x1 if i % 2 == 0 else x2
-        draw.text((x, y), text, 0, font=font)
+    elif n_column == 2:
+        
+        x1 = int(w * 0.01)
+        x2 = int(w * 0.51)
+        y0 = int(h * 0.01)
+        word_height = h // len(text_list) * 2
+        for i, text in enumerate(text_list):
+            y = (i // 2) * word_height + y0 if i % 2 == 0 else (i - 1) // 2 * word_height + y0
+            x = x1 if i % 2 == 0 else x2
+            draw.text((x, y), text, 0, font=font)
+            
+    else:
+        print("'words2image': Column {} not implemented".format(n_column))
+        raise NotImplementedError
 
     return np.array(img.convert('RGB'))
