@@ -142,13 +142,11 @@ class DiscriminatorLogits(nn.Module):
                                           nn.LeakyReLU(0.2, inplace=True),
                                         #   nn.Dropout2d(0.5, True),
                                           nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
-                                          nn.Sigmoid()
                                           )
         else:
             self.outlogits = nn.Sequential(
                                         #   nn.Dropout2d(0.5, True),
                                           nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
-                                          nn.Sigmoid()
                                           )
 
     def forward(self, h_code, c_code=None):
@@ -173,7 +171,7 @@ class GeneratorAlt1(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         
-        self.main = nn.Sequential(                                                                
+        self.main = nn.Sequential(
             ## 1 x 2000
             nn.ConvTranspose2d(1 * 2000, 64, kernel_size=4, stride=1, padding=0, bias=False),  
             ## 64 x 4 x 4
