@@ -81,11 +81,12 @@ class BaseModel(ABC):
 
 class GANModel(BaseModel):
 
-    def __init__(self, config, model_file=None, mode='train'):
+    def __init__(self, config, model_file=None, mode='train', reset_lr=False):
 
         assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
         self.config = config
         self.mode = mode
+        self.reset_lr = reset_lr
         self.device = config.DEVICE
         self.model_name = config.MODEL_NAME
         self.log_header = config.LOG_HEADER
@@ -141,7 +142,7 @@ class GANModel(BaseModel):
                           'd_lr_scheduler' : None,
                           'epoch' : None
                           }
-        self.epoch = 0
+        self.epoch = 1
         self.loss_G = None
         self.loss_D = None
         self.model_dir = None
@@ -164,7 +165,7 @@ class GANModel(BaseModel):
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
         print("\tGAN loss:", gan_loss)
-        print("\tLearning rate:", lr)
+        print("\tLearning rates (G, D):", self.G_optimizer.param_groups[0]['lr'], self.D_optimizer.param_groups[0]['lr'])
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
@@ -174,11 +175,14 @@ class GANModel(BaseModel):
         self.G.load_state_dict(state['g'])
         if self.mode == 'train':
             self.G_optimizer.load_state_dict(state['g_optim'])
-            self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
             self.D.load_state_dict(state['d'])
             self.D_optimizer.load_state_dict(state['d_optim'])
+            self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
             self.D_lr_scheduler.load_state_dict(state['d_lr_scheduler'])
             self.epoch = state['epoch']
+        if self.reset_lr:
+            self.G_optimizer.param_groups[0]['lr'] = self.config.LR
+            self.D_optimizer.param_groups[0]['lr'] = self.config.LR
         self.set_state_dict()
 
     def set_state_dict(self):
@@ -308,8 +312,9 @@ class GANModel(BaseModel):
                 word, _ = word2vec_model.wv.similar_by_vector(real_wv)[0]
                 words.append(word)
 
-            ## Words are visualized by converting image
-            word_image = words2image(words)
+            ## Unique words are visualized by converting into image
+            words = np.unique(words)
+            word_image = words2image(words, self.config)
 
             ## Inverse normalize  ## TODO if input not normalized remove it
             fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
