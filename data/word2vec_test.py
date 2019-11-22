@@ -30,7 +30,7 @@ if __name__ == "__main__":
         exit()
     SUBSET = sys.argv[1]
     MODEL_FILENAME = SUBSET + '_word2vec.model'
-    MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', MODEL_FILENAME))
+    MODEL_FILE = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir, 'models', 'word2vec', MODEL_FILENAME))
     TOP_N = 20
 
     ## Check model file
