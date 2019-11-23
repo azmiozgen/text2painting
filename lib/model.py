@@ -262,7 +262,7 @@ class GANModel(BaseModel):
 
         return real_real_pair, real_fake_pair, fake_real_pair
 
-    def backward_D(self, rr_pair, rf_pair, fr_pair):
+    def backward_D(self, rr_pair, rf_pair, fr_pair, update=True):
         # Real-real
         pred_rr = self.D(rr_pair)
         self.loss_D_rr, self.accuracy_D_rr = self.criterionGAN(pred_rr, target_is_real=True)
@@ -284,9 +284,10 @@ class GANModel(BaseModel):
             self.loss_gp_rf.backward(retain_graph=True)
 
         self.loss_D = self.loss_D_rr + self.loss_D_rf + 0.5 * self.loss_D_fr
-        self.loss_D.backward()
+        if update:
+            self.loss_D.backward()
 
-    def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor):
+    def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True):
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
         
@@ -294,7 +295,8 @@ class GANModel(BaseModel):
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
         self.loss_G = loss_G_GAN + loss_G_L1
-        self.loss_G.backward()
+        if update:
+            self.loss_G.backward()
 
     def get_losses(self):
         loss_g = self.loss_G.item() if self.loss_G else -1.0
@@ -364,7 +366,7 @@ class GANModel(BaseModel):
 
         return fake_images_tensor
 
-    def fit(self, data, phase='train'):
+    def fit(self, data, phase='train', train_D=True, train_G=True):
         ## Data to device
         real_images_tensor, real_wv_tensor, fake_wv_tensor = data
         real_images_tensor = real_images_tensor.to(self.device)
@@ -384,15 +386,25 @@ class GANModel(BaseModel):
 
         if phase == 'train':
             # Update D
-            self.D = self.set_requires_grad(self.D, True)     # Enable backprop for D
-            self.D_optimizer.zero_grad()                      # Set D's gradients to zero
-            self.backward_D(rr_pair, rf_pair, fr_pair)
-            self.D_optimizer.step()
+            self.D = self.set_requires_grad(self.D, train_D)     # Enable backprop for D
+            self.D_optimizer.zero_grad()                         # Set D's gradients to zero
+            self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D)
+            if train_D:
+                self.D_optimizer.step()
 
             # Update G
-            self.D = self.set_requires_grad(self.D, False)    # Disable backprop for D
+            self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
+            self.G = self.set_requires_grad(self.G, train_G)
             self.G_optimizer.zero_grad()                      # Set G's gradients to zero
-            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor)                   
-            self.G_optimizer.step()
+            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G)
+            if train_G:
+                self.G_optimizer.step()
+        else:
+            self.D = self.set_requires_grad(self.D, False)
+            self.G = self.set_requires_grad(self.G, False)
 
+            self.D_optimizer.zero_grad()
+            self.backward_D(rr_pair, rf_pair, fr_pair, update=False)
 
+            self.G_optimizer.zero_grad()
+            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False)

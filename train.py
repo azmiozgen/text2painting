@@ -87,20 +87,37 @@ if __name__ == "__main__":
             total_acc_fr = 0.0
 
         for phase in ['train', 'val']:
+
             phase_start = time.time()
             print("\t{} phase:".format(phase.title()))
+
             if phase == 'train':
+
+                ## Set network to train
+                if CONFIG.TRAIN_D_TREND == 1:
+                    train_D = True
+                    train_G = True
+                elif (epoch - 1) % CONFIG.TRAIN_D_TREND == 0:
+                    train_D = True
+                    train_G = False
+                else:
+                    train_D = False
+                    train_G = True
+                print("\tUpdate D: {}, Update G: {}".format(str(train_D), str(train_G)))
                 # data_loader = val_loader  ## TODO
                 # n_batch = n_val_batch
                 data_loader = train_loader
                 n_batch = n_train_batch
                 model.G.train()
                 model.D.train()
+
             else:
                 data_loader = val_loader
                 n_batch = n_val_batch
                 model.G.eval()
                 model.D.eval()
+                train_D = False
+                train_G = False
 
             for i, data in enumerate(data_loader):
                 iteration = (epoch - 1) * n_batch + i
@@ -113,12 +130,10 @@ if __name__ == "__main__":
                 # print("Fake WV:", fake_wv_tensor.shape)
 
                 ## Fit batch
-                # print("\nModel optimizing..")
-                model.fit(data, phase=phase)
+                model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
 
                 ## Update total loss
                 loss_g, loss_d, loss_gp_fr, loss_gp_rf = model.get_losses()
-                # loss_g, loss_d = -1.0, -1.0
                 total_loss_g += loss_g
                 total_loss_d += loss_d
                 if loss_gp_fr:

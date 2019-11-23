@@ -50,7 +50,7 @@ class Config():
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
-        self.HORIZONTAL_FLIPPING = False
+        self.HORIZONTAL_FLIPPING = True
         self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
         self.RANDOM_CHANNEL_SWAPPING = False
@@ -67,12 +67,13 @@ class Config():
 
         ## GAN options
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
-        self.NGF = 64
-        # self.NGF = 32
-        self.NDF = 64
-        # self.NDF = 32
-        self.GAN_LOSS = 'wgangp'   ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.LAMBDA_L1 = 10.0
+        self.NGF = 128
+        self.NDF = 128
+        self.GAN_LOSS = 'lsgan'   ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.LAMBDA_L1 = 100.0
+        self.TRAIN_D_TREND = 3    ## If 1: Train both G and D at the same epoch
+                                  ## If 2: Train D at multiples of 2, the rest is G
+                                  ## If 3: Train D at multiples of 3, the rest is G and so on..
 
         ## Hyper-params
         self.BATCH_SIZE = 64
