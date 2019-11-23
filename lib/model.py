@@ -386,8 +386,8 @@ class GANModel(BaseModel):
 
         if phase == 'train':
             # Update D
-            self.D = self.set_requires_grad(self.D, train_D)     # Enable backprop for D
-            self.D_optimizer.zero_grad()                         # Set D's gradients to zero
+            self.D = self.set_requires_grad(self.D, train_D)
+            self.D_optimizer.zero_grad()
             self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D)
             if train_D:
                 self.D_optimizer.step()
@@ -395,16 +395,13 @@ class GANModel(BaseModel):
             # Update G
             self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
             self.G = self.set_requires_grad(self.G, train_G)
-            self.G_optimizer.zero_grad()                      # Set G's gradients to zero
+            self.G_optimizer.zero_grad()
             self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G)
             if train_G:
                 self.G_optimizer.step()
         else:
-            self.D = self.set_requires_grad(self.D, False)
-            self.G = self.set_requires_grad(self.G, False)
+            # self.D = self.set_requires_grad(self.D, False)
+            # self.G = self.set_requires_grad(self.G, False)
 
-            self.D_optimizer.zero_grad()
             self.backward_D(rr_pair, rf_pair, fr_pair, update=False)
-
-            self.G_optimizer.zero_grad()
             self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False)
