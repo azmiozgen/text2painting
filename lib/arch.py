@@ -98,11 +98,11 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
         ndf = config.NDF
         ngf = config.NGF
-        n_channel = config.N_CHANNELS * 2   ## Stitching images and word vectors
+        n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
         self.ndf = ndf
         self.ngf = ngf
 
-        self.conv = nn.Sequential(                                                        # (6) x H x W
+        self.conv = nn.Sequential(                                                        # (4) x H x W
                                  nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),    # (ndf) x H/2 x W/2
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4

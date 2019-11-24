@@ -164,8 +164,8 @@ class GANModel(BaseModel):
             print("{} created.".format(self.model_dir))
         time.sleep(1.0)
 
-        print(self.G)
-        print(self.D)
+        # print(self.G)
+        # print(self.D)
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
@@ -252,8 +252,9 @@ class GANModel(BaseModel):
 
     def stitch_data(self, data, fake_images_tensor):
         real_images_tensor, real_wv_tensor, fake_wv_tensor = data
-        real_wv_tensor_reshaped = real_wv_tensor.reshape(real_images_tensor.shape)
-        fake_wv_tensor_reshaped = fake_wv_tensor.reshape(real_images_tensor.shape)
+        b, _, h, w = real_images_tensor.shape
+        real_wv_tensor_reshaped = real_wv_tensor.reshape((b, 1, h, w))
+        fake_wv_tensor_reshaped = fake_wv_tensor.reshape((b, 1, h, w))
 
         ## Stitch images and word vectors on channel axis
         real_real_pair = torch.cat((real_images_tensor, real_wv_tensor_reshaped), 1)
@@ -290,7 +291,7 @@ class GANModel(BaseModel):
     def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True):
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
-        
+
         loss_G_GAN, _ = self.criterionGAN(pred_fr, target_is_real=True)
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
@@ -385,23 +386,24 @@ class GANModel(BaseModel):
         # print("Fake-real pair:", fr_pair.shape)
 
         if phase == 'train':
-            # Update D
+
+            ## Update D
             self.D = self.set_requires_grad(self.D, train_D)
+            # all_true = np.all([param.requires_grad for param in self.D.parameters()])
+            # print("All D parameters have grad:", str(all_true))
             self.D_optimizer.zero_grad()
             self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D)
             if train_D:
                 self.D_optimizer.step()
 
-            # Update G
+            ## Update G
             self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
             self.G = self.set_requires_grad(self.G, train_G)
             self.G_optimizer.zero_grad()
             self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G)
             if train_G:
                 self.G_optimizer.step()
-        else:
-            # self.D = self.set_requires_grad(self.D, False)
-            # self.G = self.set_requires_grad(self.G, False)
 
+        else:
             self.backward_D(rr_pair, rf_pair, fr_pair, update=False)
             self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False)

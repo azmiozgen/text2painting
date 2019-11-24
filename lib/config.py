@@ -16,35 +16,24 @@ class Config():
         self.MODEL_NAME = SUBSET
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,D_rr_acc,D_rf_acc,D_fr_acc'
 
-        ## Shapes  !!! L X S = C x W x H !!!
-        self.SENTENCE_LENGTH = 16  # 16
-        self.WV_SIZE = 768  # 3072
-        self.IMAGE_SIZE_WIDTH = 64  ## 128
-        self.IMAGE_SIZE_HEIGHT = 64  ## 128
+        ## Shapes  !!! L X S = W x H !!!
+        self.SENTENCE_LENGTH = 8
+        self.WV_SIZE = 512        ## Should be same as in data/config.py
+        self.IMAGE_SIZE_WIDTH = 64
+        self.IMAGE_SIZE_HEIGHT = 64
         self.N_CHANNELS = 3
-        assert self.SENTENCE_LENGTH * self.WV_SIZE == self.N_CHANNELS * self.IMAGE_SIZE_WIDTH * self.IMAGE_SIZE_HEIGHT, \
-               "Incompatible shapes {} x {} != {} x {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, self.N_CHANNELS, \
-                                                                    self.IMAGE_SIZE_WIDTH, self.IMAGE_SIZE_HEIGHT)
+        assert self.SENTENCE_LENGTH * self.WV_SIZE == self.IMAGE_SIZE_WIDTH * self.IMAGE_SIZE_HEIGHT, \
+               "Incompatible shapes {} x {} != {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, \
+                                                               self.IMAGE_SIZE_WIDTH, self.IMAGE_SIZE_HEIGHT)
 
         ## Stats (Change w.r.t stats file under data/)
-        self.MEAN = [0.2085, 0.3912, 0.4920]
-        self.STD = [0.1383, 0.2215, 0.2465]
-
-        ## Word2Vec
-        self.WV_MIN_COUNT = 5       ## Ignores all words with total frequency lower than this.
-        self.WV_WINDOW = 12         ## Maximum distance between the current and predicted word within a sentence.
-        # self.WV_SIZE              ## Dimensionality of the word vectors.
-        self.WV_SAMPLE = 1e-4       ## The threshold for configuring which higher-frequency words are randomly downsampled. EFFECTIVE!
-        self.WV_ALPHA = 1e-2        ## Initial learning rate
-        self.WV_MIN_ALPHA = 1e-5    ## Minimum learning rate
-        self.WV_EPOCHS = 100        ## Training epochs
-        self.WV_NEGATIVE = 5        ## If > 0, negative sampling will be used, 
-                                    ## the int for negative specifies how many “noise words” should be drawn (usually between 5-20). 
-                                    ## If set to 0, no negative sampling is used.
+        self.MEAN = [0.4731, 0.4638, 0.6420]
+        self.STD = [0.1421, 0.3141, 0.2030]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
-        self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
+        # self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
+        self.GROUP_N_LABELS_RANGES = [0, 10, 20]
         self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
         self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
@@ -71,9 +60,8 @@ class Config():
         self.NDF = 128
         self.GAN_LOSS = 'lsgan'   ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 100.0
-        self.TRAIN_D_TREND = 3    ## If 1: Train both G and D at the same epoch
-                                  ## If 2: Train D at multiples of 2, the rest is G
-                                  ## If 3: Train D at multiples of 3, the rest is G and so on..
+        self.TRAIN_D_TREND = 3    ## e.g. Train D for each 3 epoch, freeze at others
+        self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
 
         ## Hyper-params
         self.BATCH_SIZE = 64

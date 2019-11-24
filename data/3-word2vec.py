@@ -12,6 +12,7 @@ from gensim.models import word2vec, Word2Vec
 from gensim.models.phrases import Phrases, Phraser
 import spacy
 
+from config import Config
 
 
 class StemmingLemmatization():
@@ -121,9 +122,6 @@ if __name__ == "__main__":
         print(LABELS_FILE, "not found. Exiting")
         exit()
 
-    CONFIG_FILE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-    sys.path.append(CONFIG_FILE_DIR)
-    from lib.config import Config
     config = Config()
 
     ## Read labels file

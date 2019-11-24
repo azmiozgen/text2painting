@@ -40,7 +40,7 @@ if __name__ == "__main__":
     accuracy = args.accuracy
 
     ## Data loaders
-    print("\nData loaders initializing..")
+    print("Data loaders initializing..")
     train_dataset = TextArtDataLoader(CONFIG, mode='train')
     val_dataset = TextArtDataLoader(CONFIG, mode='val')
     train_align_collate = AlignCollate(CONFIG, 'train')
@@ -94,15 +94,8 @@ if __name__ == "__main__":
             if phase == 'train':
 
                 ## Set network to train
-                if CONFIG.TRAIN_D_TREND == 1:
-                    train_D = True
-                    train_G = True
-                elif (epoch - 1) % CONFIG.TRAIN_D_TREND == 0:
-                    train_D = True
-                    train_G = False
-                else:
-                    train_D = False
-                    train_G = True
+                train_D = True if epoch % CONFIG.TRAIN_D_TREND == 0 else False
+                train_G = True if epoch % CONFIG.TRAIN_G_TREND == 0 else False
                 print("\tUpdate D: {}, Update G: {}".format(str(train_D), str(train_G)))
                 # data_loader = val_loader  ## TODO
                 # n_batch = n_val_batch
