@@ -119,13 +119,13 @@ class GANModel(BaseModel):
 
             self.G_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_optimizer, 
                                                                              mode='min',
-                                                                             factor=0.5,
+                                                                             factor=0.75,
                                                                              threshold=0.01,
                                                                              patience=10)
             
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
-                                                                             factor=0.5,
+                                                                             factor=0.75,
                                                                              threshold=0.01,
                                                                              patience=10)
 
