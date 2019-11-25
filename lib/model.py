@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import Generator, Discriminator
+from .arch import GeneratorResNet, DiscriminatorStackGAN1
 from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities
 
 class BaseModel(ABC):
@@ -100,11 +100,11 @@ class GANModel(BaseModel):
         self.lambda_l1 = config.LAMBDA_L1
 
         ## Init G and D
-        self.G = Generator(config).to(self.device)
+        self.G = GeneratorResNet(config).to(self.device)
 
         ## Init networks and optimizers
         if mode == 'train':
-            self.D = Discriminator(config).to(self.device)
+            self.D = DiscriminatorStackGAN1(config).to(self.device)
 
             self.criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=accuracy).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()

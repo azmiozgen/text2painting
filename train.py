@@ -13,7 +13,6 @@ from PIL import Image, ImageFilter
 import torch
 import torch.nn as nn
 from gensim.models import Word2Vec
-from lib.arch import Discriminator, Generator
 from lib.config import Config
 from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
 from lib.model import GANModel
@@ -94,8 +93,8 @@ if __name__ == "__main__":
             if phase == 'train':
 
                 ## Set network to train
-                train_D = True if epoch % CONFIG.TRAIN_D_TREND == 0 else False
-                train_G = True if epoch % CONFIG.TRAIN_G_TREND == 0 else False
+                train_D = True if (epoch - 1) % CONFIG.TRAIN_D_TREND == 0 else False
+                train_G = True if (epoch - 1) % CONFIG.TRAIN_G_TREND == 0 else False
                 print("\tUpdate D: {}, Update G: {}".format(str(train_D), str(train_G)))
                 # data_loader = val_loader  ## TODO
                 # n_batch = n_val_batch

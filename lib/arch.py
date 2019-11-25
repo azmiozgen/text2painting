@@ -28,29 +28,112 @@ def upsample_block(in_planes, out_planes):
 
     return block
 
-class ResBlock(nn.Module):
-    def __init__(self, n_channels):
-        super(ResBlock, self).__init__()
+class ResnetBlock(nn.Module):
 
-        self.block = nn.Sequential(
-                                  conv3x3(n_channels, n_channels),
-                                  nn.BatchNorm2d(n_channels),
-                                  nn.ReLU(True),
-                                  conv3x3(n_channels, n_channels),
-                                  nn.BatchNorm2d(n_channels)
-                                  )
+    def __init__(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+        super(ResnetBlock, self).__init__()
+        self.conv_block = self.build_conv_block(dim, padding_type, norm_layer, use_dropout, use_bias)
 
-        self.relu = nn.ReLU(inplace=True)
+    def build_conv_block(self, dim, padding_type, norm_layer, use_dropout, use_bias):
+        conv_block = []
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim), nn.ReLU(True)]
+        if use_dropout:
+            conv_block += [nn.Dropout(0.5)]
+
+        p = 0
+        if padding_type == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+        elif padding_type == 'replicate':
+            conv_block += [nn.ReplicationPad2d(1)]
+        elif padding_type == 'zero':
+            p = 1
+        else:
+            raise NotImplementedError('padding [%s] is not implemented' % padding_type)
+        conv_block += [nn.Conv2d(dim, dim, kernel_size=3, padding=p, bias=use_bias), norm_layer(dim)]
+
+        return nn.Sequential(*conv_block)
 
     def forward(self, x):
-        residual = x
-        out = self.block(x)
-        out += residual
-        out = self.relu(out)
+        out = x + self.conv_block(x)  # add skip connections
         return out
 
 
-class Generator(nn.Module):
+class GeneratorResNet(nn.Module):
+
+    def __init__(self, config):
+        super(GeneratorResNet, self).__init__()
+
+        n_input = config.N_INPUT
+        ngf = config.NGF
+        self.ngf = ngf
+        norm_layer = config.NORM_LAYER
+        use_dropout = config.USE_DROPOUT
+        n_blocks = config.N_BLOCKS
+        padding_type = config.PADDING_TYPE
+        assert(n_blocks >= 0)
+
+        if type(norm_layer) == functools.partial:
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        self.fc = nn.Sequential(
+                               nn.Linear(n_input, ngf * 4 * 4, bias=False),
+                               nn.BatchNorm1d(ngf * 4 * 4),
+                               nn.ReLU(True)
+                               )                              # -> ngf x H x W
+
+        self.start = nn.Sequential(nn.ReflectionPad2d(3),
+                                   nn.Conv2d(ngf, ngf, kernel_size=7, padding=0, bias=use_bias),
+                                   norm_layer(ngf),
+                                   nn.ReLU(True))             # -> ngf x H x W
+
+        blocks = []
+        for i in range(n_blocks):       # add ResNet blocks
+            blocks += [ResnetBlock(ngf, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+        self.blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
+
+        self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x H x W -> ngf/2 x 2H x 2W
+        self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
+        self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
+        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        
+        self.finish = nn.Sequential(nn.ReflectionPad2d(3),
+                                    nn.Conv2d(ngf // 16, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Tanh())
+
+    def forward(self, word_vectors):
+        out = self.fc(word_vectors)
+        out = out.view(-1, self.ngf, 4, 4)
+        out = self.start(out)
+        out = self.blocks(out)
+        out = self.upsample1(out)
+        out = self.upsample2(out)
+        out = self.upsample3(out)
+        out = self.upsample4(out)
+        out = self.finish(out)
+
+        return out
+
+if __name__ == '__main__':
+    from config import Config
+    config = Config()
+    G = GeneratorResNet(config)
+    image = torch.Tensor(2, 4096)
+    G(image)
+
+
+class GeneratorStackGAN1(nn.Module):
     def __init__(self, config):
         super(Generator, self).__init__()
 
@@ -93,9 +176,9 @@ class Generator(nn.Module):
         return out
 
 ### DO NOT USE BatchNorm in D if WGANGP is used as loss function ###
-class Discriminator(nn.Module):
+class DiscriminatorStackGAN1(nn.Module):
     def __init__(self, config):
-        super(Discriminator, self).__init__()
+        super(DiscriminatorStackGAN1, self).__init__()
         ndf = config.NDF
         ngf = config.NGF
         n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
@@ -164,11 +247,10 @@ class DiscriminatorLogits(nn.Module):
 
 
 
-## ------------------------------------------------
 
 
 
-class GeneratorAlt1(nn.Module):
+class GeneratorSimple(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
         
@@ -198,7 +280,7 @@ class GeneratorAlt1(nn.Module):
     def forward(self, x):
         return self.main(x)
 
-class DiscriminatorAlt1(nn.Module):
+class DiscriminatorSimple(nn.Module):
     def __init__(self):
         super(Discriminator, self).__init__()
         self.main = nn.Sequential(                                                ## 3 x H x W
