@@ -9,4 +9,4 @@ lib/__pycache__
 data/deviantart/images
 data/wikiart/images
 
-models/
+models/*/
