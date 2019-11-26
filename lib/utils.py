@@ -55,15 +55,15 @@ class GANLoss(nn.Module):
 
         ## Compute accuracy
         if self.accuracy:
-            _prediction = prediction.detach().cpu().numpy()
-            _target_tensor = target_tensor.detach().cpu().numpy()
+            _prediction = prediction.detach().cpu()
+            _target_tensor = target_tensor.detach().cpu()
             if target_is_real:
-                accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
+                accuracy = torch.mean(((torch.sigmoid(_prediction) >= 0.5).float() == _target_tensor).float()).item()
             else:
-                accuracy = np.mean(np.argmax(_prediction, axis=1) == _target_tensor)
+                accuracy = torch.mean(((torch.sigmoid(_prediction) < 0.5).float() == _target_tensor).float()).item()
             return loss, accuracy
 
-        return loss, 0.0
+        return loss, -1.0
 
 def get_gradient_penalty(netD, real_data, fake_data, device, type='mixed', constant=1.0, lambda_gp=10.0):
     """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028

@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorStackGAN1
+from .arch import GeneratorResNet, DiscriminatorPixel
 from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities
 
 class BaseModel(ABC):
@@ -81,13 +81,12 @@ class BaseModel(ABC):
 
 class GANModel(BaseModel):
 
-    def __init__(self, config, model_file=None, mode='train', reset_lr=False, accuracy=False):
+    def __init__(self, config, model_file=None, mode='train', reset_lr=False):
 
         assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
         self.config = config
         self.mode = mode
         self.reset_lr = reset_lr
-        self.accuracy = accuracy
         self.device = config.DEVICE
         self.model_name = config.MODEL_NAME
         self.log_header = config.LOG_HEADER
@@ -104,9 +103,10 @@ class GANModel(BaseModel):
 
         ## Init networks and optimizers
         if mode == 'train':
-            self.D = DiscriminatorStackGAN1(config).to(self.device)
+            self.D = DiscriminatorPixel(config).to(self.device)
 
-            self.criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=accuracy).to(self.device)
+            self.G_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=False).to(self.device)
+            self.D_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
             self.criterionL1 = torch.nn.L1Loss()
             self.G_optimizer = torch.optim.Adam(self.G.parameters(),
                                                 lr=lr,
@@ -266,15 +266,15 @@ class GANModel(BaseModel):
     def backward_D(self, rr_pair, rf_pair, fr_pair, update=True):
         # Real-real
         pred_rr = self.D(rr_pair)
-        self.loss_D_rr, self.accuracy_D_rr = self.criterionGAN(pred_rr, target_is_real=True)
+        self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True)
 
         ## Real-fake
         pred_rf = self.D(rf_pair)
-        self.loss_D_rf, self.accuracy_D_rf = self.criterionGAN(pred_rf, target_is_real=False)
+        self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False)
 
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
-        self.loss_D_fr, self.accuracy_D_fr = self.criterionGAN(pred_fr, target_is_real=False)
+        self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False)
 
         if self.gan_loss == 'wgangp':
             self.loss_gp_fr, _ = get_gradient_penalty(self.D, rr_pair, fr_pair.detach(), self.device,
@@ -292,7 +292,7 @@ class GANModel(BaseModel):
         ## Fake-real
         pred_fr = self.D(fr_pair.detach())
 
-        loss_G_GAN, _ = self.criterionGAN(pred_fr, target_is_real=True)
+        loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True)
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
         self.loss_G = loss_G_GAN + loss_G_L1

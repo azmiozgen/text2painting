@@ -32,11 +32,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, help='Model file to load')
     parser.add_argument('--reset_lr', action='store_true', help='Reset learning rate')
-    parser.add_argument('--accuracy', action='store_true', help='Compute accuracy (not recommended)')
     args = parser.parse_args()
     model_file = args.model
     reset_lr = args.reset_lr
-    accuracy = args.accuracy
 
     ## Data loaders
     print("Data loaders initializing..")
@@ -70,7 +68,7 @@ if __name__ == "__main__":
 
     ## Init model with G and D
     print("\nModel initializing..")
-    model = GANModel(CONFIG, model_file=model_file, mode='train', reset_lr=reset_lr, accuracy=accuracy)
+    model = GANModel(CONFIG, model_file=model_file, mode='train', reset_lr=reset_lr)
     time.sleep(1.0)
 
     print("\nTraining starting..")
@@ -80,10 +78,9 @@ if __name__ == "__main__":
         total_loss_d = 0.0
         total_loss_gp_fr = 0.0
         total_loss_gp_rf = 0.0
-        if accuracy:
-            total_acc_rr = 0.0
-            total_acc_rf = 0.0
-            total_acc_fr = 0.0
+        total_acc_rr = 0.0
+        total_acc_rf = 0.0
+        total_acc_fr = 0.0
 
         for phase in ['train', 'val']:
 
@@ -135,10 +132,9 @@ if __name__ == "__main__":
 
                 ## Get D accuracy
                 acc_rr, acc_rf, acc_fr = model.get_D_accuracy()
-                if accuracy:
-                    total_acc_rr += acc_rr
-                    total_acc_rf += acc_rf
-                    total_acc_fr += acc_fr
+                total_acc_rr += acc_rr
+                total_acc_rf += acc_rf
+                total_acc_fr += acc_fr
 
                 ## Save logs
                 if iteration % CONFIG.N_LOG_BATCH == 0:
@@ -167,18 +163,16 @@ if __name__ == "__main__":
             total_loss_d /= n_batch
             total_loss_gp_fr /= n_batch
             total_loss_gp_rf /= n_batch
-            if accuracy:
-                total_acc_rr /= n_batch
-                total_acc_rf /= n_batch
-                total_acc_fr /= n_batch
+            total_acc_rr /= n_batch
+            total_acc_rf /= n_batch
+            total_acc_fr /= n_batch
             if CONFIG.GAN_LOSS == 'wgangp':
                 print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
                 print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')
                 print("| GP loss real-fake: {:.4f}".format(total_loss_gp_rf))
             else:
                 print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()))
-            if accuracy:
-                print("\t\tAccuracy D real-real: {:.4f} | real-fake {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
+            print("\t\tAccuracy D real-real: {:.4f} | real-fake {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
             print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
 
         ## Update lr

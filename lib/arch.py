@@ -175,6 +175,33 @@ class GeneratorStackGAN1(nn.Module):
 
         return out
 
+
+class DiscriminatorPixel(nn.Module):
+
+    def __init__(self, config):
+        super(DiscriminatorPixel, self).__init__()
+
+        ndf = config.NDF
+        n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
+        norm_layer = config.NORM_LAYER
+
+        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        self.net = nn.Sequential(
+                                nn.Conv2d(n_channel, ndf, kernel_size=1, stride=1, padding=0),
+                                nn.LeakyReLU(0.2, True),
+                                nn.Conv2d(ndf, ndf * 2, kernel_size=1, stride=1, padding=0, bias=use_bias),
+                                norm_layer(ndf * 2),
+                                nn.LeakyReLU(0.2, True),
+                                nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)
+                                )
+
+    def forward(self, x):
+        return self.net(x)
+
 ### DO NOT USE BatchNorm in D if WGANGP is used as loss function ###
 class DiscriminatorStackGAN1(nn.Module):
     def __init__(self, config):
@@ -185,10 +212,10 @@ class DiscriminatorStackGAN1(nn.Module):
         self.ndf = ndf
         self.ngf = ngf
 
-        self.conv = nn.Sequential(                                                        # (4) x H x W
-                                 nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),    # (ndf) x H/2 x W/2
+        self.conv = nn.Sequential(                                                    # (4) x H x W
+                                 nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),      # (ndf) x H/2 x W/2
                                  nn.LeakyReLU(0.2, inplace=True),
-                                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),      # (ndf * 2) x H/4 x W/4
+                                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),        # (ndf * 2) x H/4 x W/4
                                  nn.BatchNorm2d(ndf * 2),
                                 #  nn.InstanceNorm2d(ndf * 2),
                                  nn.LeakyReLU(0.2, inplace=True),
