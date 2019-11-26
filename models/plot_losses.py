@@ -56,5 +56,5 @@ if __name__ == '__main__':
     df_train = pd.read_csv(train_csv_file, delimiter=',')
     df_val = pd.read_csv(val_csv_file, delimiter=',')
 
-    plot(df_train, train_output_file)
-    plot(df_val, val_output_file)
+    plot(df_train, train_output_file, mode='train')
+    plot(df_val, val_output_file, mode='val')
