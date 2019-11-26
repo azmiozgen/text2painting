@@ -127,8 +127,8 @@ class AlignCollate(object):
         self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
         self.mean = config.MEAN
         self.std = config.STD
-        self.image_size_height = config.IMAGE_SIZE_HEIGHT
-        self.image_size_width = config.IMAGE_SIZE_WIDTH
+        self.image_height = config.IMAGE_HEIGHT
+        self.image_width = config.IMAGE_WIDTH
         self.horizontal_flipping = config.HORIZONTAL_FLIPPING
         self.random_rotation = config.RANDOM_ROTATION
         self.color_jittering = config.COLOR_JITTERING
@@ -171,7 +171,7 @@ class AlignCollate(object):
             if self.random_grayscale:
                 self.grayscaler = ImageUtilities.image_random_grayscaler(p=0.5)
 
-        self.resizer = ImageUtilities.image_resizer(self.image_size_height, self.image_size_width)
+        self.resizer = ImageUtilities.image_resizer(self.image_height, self.image_width)
         self.normalizer = ImageUtilities.image_normalizer(self.mean, self.std)
 
     def __preprocess(self, image):

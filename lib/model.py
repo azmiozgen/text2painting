@@ -250,30 +250,49 @@ class GANModel(BaseModel):
             param.requires_grad = requires_grad
         return net
 
-    def stitch_data(self, data, fake_images_tensor):
-        real_images_tensor, real_wv_tensor, fake_wv_tensor = data
-        b, _, h, w = real_images_tensor.shape
-        real_wv_tensor_reshaped = real_wv_tensor.reshape((b, 1, h, w))
-        fake_wv_tensor_reshaped = fake_wv_tensor.reshape((b, 1, h, w))
+    # def stitch_data(self, data, fake_images_tensor):
+    #     real_images_tensor, real_wv_tensor, fake_wv_tensor = data
+    #     b, _, h, w = real_images_tensor.shape
+    #     real_wv_tensor_reshaped = real_wv_tensor.reshape((b, 1, h, w))
+    #     fake_wv_tensor_reshaped = fake_wv_tensor.reshape((b, 1, h, w))
 
-        ## Stitch images and word vectors on channel axis
-        real_real_pair = torch.cat((real_images_tensor, real_wv_tensor_reshaped), 1)
-        real_fake_pair = torch.cat((real_images_tensor, fake_wv_tensor_reshaped), 1)
-        fake_real_pair = torch.cat((fake_images_tensor, real_wv_tensor_reshaped), 1)
+    #     ## Stitch images and word vectors on channel axis
+    #     real_real_pair = torch.cat((real_images_tensor, real_wv_tensor_reshaped), 1)
+    #     real_fake_pair = torch.cat((real_images_tensor, fake_wv_tensor_reshaped), 1)
+    #     fake_real_pair = torch.cat((fake_images_tensor, real_wv_tensor_reshaped), 1)
+
+    #     return real_real_pair, real_fake_pair, fake_real_pair
+
+    def set_inputs(self, data, fake_images_tensor):
+        real_images_tensor, real_wv_tensor, fake_wv_tensor = data
+        b = real_wv_tensor.size(0)
+        real_wv_tensor = real_wv_tensor.view(b, -1)
+        fake_wv_tensor = fake_wv_tensor.view(b, -1)
+
+        ## Make pairs
+        real_real_pair = (real_images_tensor, real_wv_tensor)
+        real_fake_pair = (real_images_tensor, fake_wv_tensor)
+        fake_real_pair = (fake_images_tensor, real_wv_tensor)
 
         return real_real_pair, real_fake_pair, fake_real_pair
 
     def backward_D(self, rr_pair, rf_pair, fr_pair, update=True):
+
+        ## Open pairs
+        real_images, real_wvs = rr_pair
+        real_images, fake_wvs = rf_pair
+        fake_images, real_wvs = fr_pair
+
         # Real-real
-        pred_rr = self.D(rr_pair)
+        pred_rr = self.D(real_images, real_wvs)
         self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True)
 
         ## Real-fake
-        pred_rf = self.D(rf_pair)
+        pred_rf = self.D(real_images, fake_wvs)
         self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False)
 
         ## Fake-real
-        pred_fr = self.D(fr_pair.detach())
+        pred_fr = self.D(fake_images.detach(), real_wvs.detach())
         self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False)
 
         if self.gan_loss == 'wgangp':
@@ -289,8 +308,12 @@ class GANModel(BaseModel):
             self.loss_D.backward()
 
     def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True):
+
+        ## Open pair
+        fake_images, real_wvs = fr_pair
+
         ## Fake-real
-        pred_fr = self.D(fr_pair.detach())
+        pred_fr = self.D(fake_images.detach(), real_wvs.detach())
 
         loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True)
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
@@ -380,7 +403,7 @@ class GANModel(BaseModel):
         # print("G output:", fake_images_tensor.shape)
 
         ## Stich images and word vectors on channel axis
-        rr_pair, rf_pair, fr_pair = self.stitch_data(data, fake_images_tensor)
+        rr_pair, rf_pair, fr_pair = self.set_inputs(data, fake_images_tensor)
         # print("Real-real pair:", rr_pair.shape)
         # print("Real-fake pair:", rf_pair.shape)
         # print("Fake-real pair:", fr_pair.shape)

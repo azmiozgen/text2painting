@@ -164,8 +164,8 @@ def get_uuid():
 
 def words2image(text_list, config):
 
-    w = config.IMAGE_SIZE_WIDTH
-    h = config.IMAGE_SIZE_HEIGHT
+    w = config.IMAGE_WIDTH
+    h = config.IMAGE_HEIGHT
     n_column = config.WORDS2IMAGE_N_COLUMN
 
     img = Image.fromarray(np.ones((h, w)))

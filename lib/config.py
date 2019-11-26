@@ -16,15 +16,15 @@ class Config():
         self.MODEL_NAME = SUBSET
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,D_rr_acc,D_rf_acc,D_fr_acc'
 
-        ## Shapes  !!! L X S = W x H !!!
+        ## Shapes
         self.SENTENCE_LENGTH = 8
-        self.WV_SIZE = 512        ## Should be same as in data/config.py
-        self.IMAGE_SIZE_WIDTH = 64
-        self.IMAGE_SIZE_HEIGHT = 64
+        self.WV_SIZE = 64        ## Should be same as in data/config.py
+        self.IMAGE_WIDTH = 128
+        self.IMAGE_HEIGHT = 128
         self.N_CHANNELS = 3
-        assert self.SENTENCE_LENGTH * self.WV_SIZE == self.IMAGE_SIZE_WIDTH * self.IMAGE_SIZE_HEIGHT, \
-               "Incompatible shapes {} x {} != {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, \
-                                                               self.IMAGE_SIZE_WIDTH, self.IMAGE_SIZE_HEIGHT)
+        # assert self.SENTENCE_LENGTH * self.WV_SIZE == self.IMAGE_WIDTH * self.IMAGE_HEIGHT, \
+        #        "Incompatible shapes {} x {} != {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, \
+        #                                                        self.IMAGE_WIDTH, self.IMAGE_HEIGHT)
 
         ## Stats (Change w.r.t stats file under data/)
         self.MEAN = [0.4731, 0.4638, 0.6420]
@@ -68,7 +68,7 @@ class Config():
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
 
         ## Hyper-params
-        self.BATCH_SIZE = 64
+        self.BATCH_SIZE = 16
         self.N_EPOCHS = 100
         self.LR = 2e-4
         self.BETA = 0.5
@@ -88,4 +88,4 @@ class Config():
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
-        self.WORDS2IMAGE_N_COLUMN = 1
+        self.WORDS2IMAGE_N_COLUMN = 2

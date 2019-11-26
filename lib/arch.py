@@ -107,9 +107,10 @@ class GeneratorResNet(nn.Module):
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
         
         self.finish = nn.Sequential(nn.ReflectionPad2d(3),
-                                    nn.Conv2d(ngf // 16, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Conv2d(ngf // 32, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
                                     nn.Tanh())
 
     def forward(self, word_vectors):
@@ -121,6 +122,7 @@ class GeneratorResNet(nn.Module):
         out = self.upsample2(out)
         out = self.upsample3(out)
         out = self.upsample4(out)
+        out = self.upsample5(out)
         out = self.finish(out)
 
         return out
@@ -132,6 +134,48 @@ if __name__ == '__main__':
     image = torch.Tensor(2, 4096)
     G(image)
 
+
+
+
+class DiscriminatorPixel(nn.Module):
+
+    def __init__(self, config):
+        super(DiscriminatorPixel, self).__init__()
+
+        ndf = config.NDF
+        n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
+        fc_in = config.N_INPUT
+        fc_out = config.IMAGE_WIDTH * config.IMAGE_HEIGHT
+        norm_layer = config.NORM_LAYER
+
+        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
+            use_bias = norm_layer.func == nn.InstanceNorm2d
+        else:
+            use_bias = norm_layer == nn.InstanceNorm2d
+
+        self.fc = nn.Sequential(
+                               nn.Linear(fc_in, fc_out, bias=False),
+                               nn.BatchNorm1d(fc_out),
+                               nn.ReLU(True)
+                               )
+
+        self.conv = nn.Sequential(
+                                 nn.Conv2d(n_channel, ndf, kernel_size=1, stride=1, padding=0),
+                                 nn.LeakyReLU(0.2, True),
+                                 nn.Conv2d(ndf, ndf * 2, kernel_size=1, stride=1, padding=0, bias=use_bias),
+                                 norm_layer(ndf * 2),
+                                 nn.LeakyReLU(0.2, True),
+                                 nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)
+                                 )
+
+    def forward(self, image, word_vectors):
+        b, _, h, w = image.size()
+        wv_out = self.fc(word_vectors)
+        wv_out = wv_out.view(b, 1, h, w)
+
+        stitched = torch.cat((image, wv_out), dim=1)
+
+        return self.conv(stitched)
 
 class GeneratorStackGAN1(nn.Module):
     def __init__(self, config):
@@ -154,11 +198,12 @@ class GeneratorStackGAN1(nn.Module):
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
 
         self.dropout = nn.Dropout2d(0.5)
 
         self.image = nn.Sequential(
-                                  conv3x3(ngf // 16, n_channel),
+                                  conv3x3(ngf // 32, n_channel),
                                   nn.Tanh()
                                   )                              # -> 3 x 16H x 16W
 
@@ -174,33 +219,6 @@ class GeneratorStackGAN1(nn.Module):
         out = self.image(out)
 
         return out
-
-
-class DiscriminatorPixel(nn.Module):
-
-    def __init__(self, config):
-        super(DiscriminatorPixel, self).__init__()
-
-        ndf = config.NDF
-        n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
-        norm_layer = config.NORM_LAYER
-
-        if type(norm_layer) == functools.partial:  # no need to use bias as BatchNorm2d has affine parameters
-            use_bias = norm_layer.func == nn.InstanceNorm2d
-        else:
-            use_bias = norm_layer == nn.InstanceNorm2d
-
-        self.net = nn.Sequential(
-                                nn.Conv2d(n_channel, ndf, kernel_size=1, stride=1, padding=0),
-                                nn.LeakyReLU(0.2, True),
-                                nn.Conv2d(ndf, ndf * 2, kernel_size=1, stride=1, padding=0, bias=use_bias),
-                                norm_layer(ndf * 2),
-                                nn.LeakyReLU(0.2, True),
-                                nn.Conv2d(ndf * 2, 1, kernel_size=1, stride=1, padding=0, bias=use_bias)
-                                )
-
-    def forward(self, x):
-        return self.net(x)
 
 ### DO NOT USE BatchNorm in D if WGANGP is used as loss function ###
 class DiscriminatorStackGAN1(nn.Module):
