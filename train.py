@@ -74,18 +74,19 @@ if __name__ == "__main__":
     print("\nTraining starting..")
     for epoch in range(model.epoch, model.epoch + CONFIG.N_EPOCHS):
         print("Epoch {}/{}:".format(epoch, model.epoch + CONFIG.N_EPOCHS - 1))
-        total_loss_g = 0.0
-        total_loss_d = 0.0
-        total_loss_gp_fr = 0.0
-        total_loss_gp_rf = 0.0
-        total_acc_rr = 0.0
-        total_acc_rf = 0.0
-        total_acc_fr = 0.0
 
         for phase in ['train', 'val']:
 
             phase_start = time.time()
             print("\t{} phase:".format(phase.title()))
+
+            total_loss_g = 0.0
+            total_loss_d = 0.0
+            total_loss_gp_fr = 0.0
+            total_loss_gp_rf = 0.0
+            total_acc_rr = 0.0
+            total_acc_rf = 0.0
+            total_acc_fr = 0.0
 
             if phase == 'train':
 
@@ -159,13 +160,13 @@ if __name__ == "__main__":
                 except Exception as e:
                     print('Grid image generation failed.', e, 'Passing.')
 
-            total_loss_g /= n_batch
-            total_loss_d /= n_batch
-            total_loss_gp_fr /= n_batch
-            total_loss_gp_rf /= n_batch
-            total_acc_rr /= n_batch
-            total_acc_rf /= n_batch
-            total_acc_fr /= n_batch
+            total_loss_g /= (i + 1)
+            total_loss_d /= (i + 1)
+            total_loss_gp_fr /= (i + 1)
+            total_loss_gp_rf /= (i + 1)
+            total_acc_rr /= (i + 1)
+            total_acc_rf /= (i + 1)
+            total_acc_fr /= (i + 1)
             if CONFIG.GAN_LOSS == 'wgangp':
                 print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
                 print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')

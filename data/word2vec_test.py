@@ -45,6 +45,8 @@ if __name__ == "__main__":
     ## Test model
     keywords = ['dog', 'cat', 'female', 'male']
     for keyword in keywords:
+        if not word2vec_master.wv.vocab.get(keyword):
+            continue
         similar_words = get_similar_words(word2vec_master, keyword, topN=TOP_N)
         print("Top {} similar words to {}".format(TOP_N, keyword))
         for word in similar_words:
