@@ -106,11 +106,11 @@ class GeneratorResNet(nn.Module):
         self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x H x W -> ngf/2 x 2H x 2W
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
-        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
-        self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
+        # self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
         
         self.finish = nn.Sequential(nn.ReflectionPad2d(3),
-                                    nn.Conv2d(ngf // 32, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Conv2d(ngf // 8, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
                                     nn.Tanh())
 
     def forward(self, word_vectors):
@@ -121,8 +121,8 @@ class GeneratorResNet(nn.Module):
         out = self.upsample1(out)
         out = self.upsample2(out)
         out = self.upsample3(out)
-        out = self.upsample4(out)
-        out = self.upsample5(out)
+        # out = self.upsample4(out)
+        # out = self.upsample5(out)
         out = self.finish(out)
 
         return out
@@ -198,7 +198,7 @@ class GeneratorStackGAN1(nn.Module):
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
-        # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
+        self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
 
         self.dropout = nn.Dropout2d(0.5)
 
@@ -215,6 +215,7 @@ class GeneratorStackGAN1(nn.Module):
         out = self.upsample2(out)
         out = self.upsample3(out)
         out = self.upsample4(out)
+        out = self.upsample5(out)
         out = self.dropout(out)
         out = self.image(out)
 
@@ -226,23 +227,31 @@ class DiscriminatorStackGAN1(nn.Module):
         super(DiscriminatorStackGAN1, self).__init__()
         ndf = config.NDF
         ngf = config.NGF
+        fc_in = config.N_INPUT
+        fc_out = config.IMAGE_WIDTH * config.IMAGE_HEIGHT
         n_channel = config.N_CHANNELS + 1   ## Stitching images and word vectors
         self.ndf = ndf
         self.ngf = ngf
+
+        self.fc = nn.Sequential(
+                        nn.Linear(fc_in, fc_out, bias=False),
+                        # nn.BatchNorm1d(fc_out),
+                        nn.ReLU(True)
+                        )
 
         self.conv = nn.Sequential(                                                    # (4) x H x W
                                  nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),      # (ndf) x H/2 x W/2
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),        # (ndf * 2) x H/4 x W/4
-                                 nn.BatchNorm2d(ndf * 2),
+                                #  nn.BatchNorm2d(ndf * 2),
                                 #  nn.InstanceNorm2d(ndf * 2),
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
-                                 nn.BatchNorm2d(ndf * 4),
+                                #  nn.BatchNorm2d(ndf * 4),
                                 #  nn.InstanceNorm2d(ndf * 4),
                                  nn.LeakyReLU(0.2, inplace=True),
                                  nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
-                                 nn.BatchNorm2d(ndf * 8),
+                                #  nn.BatchNorm2d(ndf * 8),
                                 #  nn.InstanceNorm2d(ndf * 8),
                                  nn.LeakyReLU(0.2, inplace=True),
                                 #  nn.Dropout2d(0.5, True),
@@ -251,10 +260,14 @@ class DiscriminatorStackGAN1(nn.Module):
         self.get_cond_logits = DiscriminatorLogits(ndf, ngf, bcondition=False)
         self.get_uncond_logits = None
 
-    def forward(self, image):
-        out = self.conv(image)
+    def forward(self, image, word_vectors):
+        b, _, h, w = image.size()
+        wv_out = self.fc(word_vectors)
+        wv_out = wv_out.view(b, 1, h, w)
 
-        return out
+        stitched = torch.cat((image, wv_out), dim=1)
+
+        return self.conv(stitched)
 
 
 class DiscriminatorLogits(nn.Module):

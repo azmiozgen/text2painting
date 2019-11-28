@@ -125,6 +125,7 @@ class AlignCollate(object):
                        
         self.config = config
         self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
+        self.normalize = config.NORMALIZE
         self.mean = config.MEAN
         self.std = config.STD
         self.image_height = config.IMAGE_HEIGHT
@@ -213,8 +214,10 @@ class AlignCollate(object):
                 image = self.grayscaler(image)
 
         image = self.resizer(image)
-        # image = to_tensor(image)   ## Only to cancelling normalizing and see images
-        image = self.normalizer(image)
+        if self.normalize:
+            image = self.normalizer(image)  ## Does 'to_tensor'
+        else:
+            image = to_tensor(image)
 
         return image
 

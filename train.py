@@ -18,6 +18,7 @@ from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
 from lib.model import GANModel
 from torch.utils.data import DataLoader
 
+
 CONFIG = Config()
 
 
@@ -94,8 +95,6 @@ if __name__ == "__main__":
                 train_D = True if (epoch - 1) % CONFIG.TRAIN_D_TREND == 0 else False
                 train_G = True if (epoch - 1) % CONFIG.TRAIN_G_TREND == 0 else False
                 print("\tUpdate D: {}, Update G: {}".format(str(train_D), str(train_G)))
-                # data_loader = val_loader  ## TODO
-                # n_batch = n_val_batch
                 data_loader = train_loader
                 n_batch = n_train_batch
                 model.G.train()
@@ -156,7 +155,8 @@ if __name__ == "__main__":
                     if iteration % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
                         output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
                         grid_img_pil = model.generate_grid(real_wv_tensor, real_images, train_dataset.word2vec_model)
-                        model.save_output(grid_img_pil, output_filename)
+                        model.save_img_output(grid_img_pil, output_filename)
+                        # model.save_grad_output(output_filename)
                 except Exception as e:
                     print('Grid image generation failed.', e, 'Passing.')
 

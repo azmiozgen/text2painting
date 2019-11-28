@@ -8,8 +8,8 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorPixel
-from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities
+from .arch import GeneratorResNet, DiscriminatorPixel, DiscriminatorStackGAN1
+from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities, register_hooks
 
 class BaseModel(ABC):
 
@@ -97,13 +97,15 @@ class GANModel(BaseModel):
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
         self.lambda_l1 = config.LAMBDA_L1
+        self.inv_normalize = config.NORMALIZE
 
         ## Init G and D
         self.G = GeneratorResNet(config).to(self.device)
 
         ## Init networks and optimizers
         if mode == 'train':
-            self.D = DiscriminatorPixel(config).to(self.device)
+            # self.D = DiscriminatorPixel(config).to(self.device)
+            self.D = DiscriminatorStackGAN1(config).to(self.device)
 
             self.G_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
@@ -122,7 +124,7 @@ class GANModel(BaseModel):
                                                                              factor=0.75,
                                                                              threshold=0.01,
                                                                              patience=10)
-            
+
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
                                                                              factor=0.75,
@@ -164,13 +166,16 @@ class GANModel(BaseModel):
             print("{} created.".format(self.model_dir))
         time.sleep(1.0)
 
+        G_lr = self.G_optimizer.param_groups[0]['lr']
+        D_lr = self.D_optimizer.param_groups[0]['lr']
+
         # print(self.G)
         # print(self.D)
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
         print("\tGAN loss:", self.gan_loss)
-        print("\tLearning rates (G, D):", self.G_optimizer.param_groups[0]['lr'], self.D_optimizer.param_groups[0]['lr'])
+        print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
@@ -250,19 +255,6 @@ class GANModel(BaseModel):
             param.requires_grad = requires_grad
         return net
 
-    # def stitch_data(self, data, fake_images_tensor):
-    #     real_images_tensor, real_wv_tensor, fake_wv_tensor = data
-    #     b, _, h, w = real_images_tensor.shape
-    #     real_wv_tensor_reshaped = real_wv_tensor.reshape((b, 1, h, w))
-    #     fake_wv_tensor_reshaped = fake_wv_tensor.reshape((b, 1, h, w))
-
-    #     ## Stitch images and word vectors on channel axis
-    #     real_real_pair = torch.cat((real_images_tensor, real_wv_tensor_reshaped), 1)
-    #     real_fake_pair = torch.cat((real_images_tensor, fake_wv_tensor_reshaped), 1)
-    #     fake_real_pair = torch.cat((fake_images_tensor, real_wv_tensor_reshaped), 1)
-
-    #     return real_real_pair, real_fake_pair, fake_real_pair
-
     def set_inputs(self, data, fake_images_tensor):
         real_images_tensor, real_wv_tensor, fake_wv_tensor = data
         b = real_wv_tensor.size(0)
@@ -296,14 +288,14 @@ class GANModel(BaseModel):
         self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False)
 
         if self.gan_loss == 'wgangp':
-            self.loss_gp_fr, _ = get_gradient_penalty(self.D, rr_pair, fr_pair.detach(), self.device,
+            self.loss_gp_fr, _, _ = get_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
-            self.loss_gp_rf, _ = get_gradient_penalty(self.D, rr_pair, rf_pair.detach(), self.device,
+            self.loss_gp_rf, _, _ = get_gradient_penalty(self.D, rr_pair, rf_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
             self.loss_gp_fr.backward(retain_graph=True)
             self.loss_gp_rf.backward(retain_graph=True)
 
-        self.loss_D = self.loss_D_rr + self.loss_D_rf + 0.5 * self.loss_D_fr
+        self.loss_D = self.loss_D_rr + (self.loss_D_rf + self.loss_D_fr) * 0.5
         if update:
             self.loss_D.backward()
 
@@ -359,9 +351,10 @@ class GANModel(BaseModel):
             words = np.unique(words)
             word_image = words2image(words, self.config)
 
-            ## Inverse normalize  ## TODO if input not normalized remove it
-            fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
-            real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
+            ## Inverse normalize
+            if self.inv_normalize:
+                fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
+                real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
 
             ## Go to cpu numpy array
             fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
@@ -374,11 +367,32 @@ class GANModel(BaseModel):
         grid_pil = Image.fromarray(np.array(grid * 255, dtype=np.uint8))
         return grid_pil
 
-    def save_output(self, img_pil, filename):
+    def save_img_output(self, img_pil, filename):
         output_dir = os.path.join(self.model_dir, 'output')
         os.makedirs(output_dir, exist_ok=True)
-        output_file = os.path.join(output_dir, filename)
+        output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
+
+    def save_grad_output(self, filename):
+        output_dir = os.path.join(self.model_dir, 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        G_output_file = os.path.join(output_dir, 'G_grads_' + filename)
+        D_output_file = os.path.join(output_dir, 'D_grads' + filename)
+
+        if np.all([param.requires_grad for param in self.G.parameters()]):
+            get_G_dot = register_hooks(self.loss_G)
+            try:
+                G_dot = get_G_dot()
+            except AssertionError:
+                return
+            G_dot.save(G_output_file)
+        if np.all([param.requires_grad for param in self.D.parameters()]):
+            get_D_dot = register_hooks(self.loss_D)
+            try:
+                D_dot = get_D_dot()
+            except AssertionError:
+                return
+            D_dot.save(D_output_file)
 
     def forward(self, real_wv_tensor):
         ## Data to device

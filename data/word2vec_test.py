@@ -43,7 +43,7 @@ if __name__ == "__main__":
     word2vec_master = Word2Vec.load(MODEL_FILE)
 
     ## Test model
-    keywords = ['dog', 'cat', 'female', 'male']
+    keywords = ['dog', 'cat', 'female', 'male', 'horse']
     for keyword in keywords:
         if not word2vec_master.wv.vocab.get(keyword):
             continue

@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 from PIL import Image, ImageDraw, ImageFont
+from graphviz import Digraph
+from torch.autograd import Variable, Function
 
 from .preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
                          RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
@@ -24,6 +26,7 @@ class GANLoss(nn.Module):
         self.gan_mode = gan_mode
         self.device = device
         self.accuracy = accuracy
+        self.prob_flip_labels = 0.05
         if gan_mode == 'lsgan':
             self.loss = nn.MSELoss()
         elif gan_mode == 'vanilla':
@@ -35,7 +38,8 @@ class GANLoss(nn.Module):
 
     def get_target_tensor(self, prediction, target_is_real):
 
-        if target_is_real:
+        is_flip = np.random.rand() < self.prob_flip_labels   ## Flipping real-fake labels
+        if (target_is_real and not is_flip) or (not target_is_real and is_flip):
             target_tensor = self.real_label.expand_as(prediction)
             target_tensor_smooth = target_tensor.detach().cpu() - torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
         else:
@@ -69,33 +73,43 @@ def get_gradient_penalty(netD, real_data, fake_data, device, type='mixed', const
     """Calculate the gradient penalty loss, used in WGAN-GP paper https://arxiv.org/abs/1704.00028
     Arguments:
         netD (network)              -- discriminator network
-        real_data (tensor array)    -- real images
-        fake_data (tensor array)    -- generated images from the generator
+        real_data (tensor array)    -- real images - real wv pair
+        fake_data (tensor array)    -- real-fake pair or fake-real pair
         device (str)                -- GPU / CPU: from torch.device('cuda:{}'.format(self.gpu_ids[0])) if self.gpu_ids else torch.device('cpu')
         type (str)                  -- if we mix real and fake data or not [real | fake | mixed].
         constant (float)            -- the constant used in formula ( | |gradient||_2 - constant)^2
         lambda_gp (float)           -- weight for this loss
     Returns the gradient penalty loss
     """
+    real_image, real_wv = real_data[0], real_data[1]
+    image, wv = fake_data[0].detach(), fake_data[1].detach()
     if lambda_gp > 0.0:
         if type == 'real':   # either use real images, fake images, or a linear interpolation of two.
-            interpolatesv = real_data
+            interpolatesv, wv = real_image, real_wv
         elif type == 'fake':
-            interpolatesv = fake_data
+            interpolatesv, wv = image, wv
         elif type == 'mixed':
-            alpha = torch.rand(real_data.shape[0], 1, device=device)
-            alpha = alpha.expand(real_data.shape[0], real_data.nelement() // real_data.shape[0]).contiguous().view(*real_data.shape)
-            interpolatesv = alpha * real_data + ((1 - alpha) * fake_data)
+            alpha = torch.rand(real_image.shape[0], 1, device=device)
+            alpha = alpha.expand(real_image.shape[0], real_image.nelement() // real_image.shape[0]).contiguous().view(*real_image.shape)
+            interpolatesv = alpha * real_image + ((1 - alpha) * image)
+
+            alpha = torch.rand(real_wv.shape[0], 1, device=device)
+            alpha = alpha.expand(real_wv.shape[0], real_wv.nelement() // real_wv.shape[0]).contiguous().view(*real_wv.shape)
+            wv = alpha * real_wv + ((1 - alpha) * wv)
         else:
             raise NotImplementedError('{} not implemented'.format(type))
         interpolatesv.requires_grad_(True)
-        disc_interpolates = netD(interpolatesv)
-        gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=interpolatesv,
+        wv.requires_grad_(True)
+        disc_interpolates = netD(interpolatesv, wv)
+        gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=[interpolatesv, wv],
                                         grad_outputs=torch.ones(disc_interpolates.size()).to(device),
                                         create_graph=True, retain_graph=True, only_inputs=True)
-        gradients = gradients[0].view(real_data.size(0), -1)  # flat the data
-        gradient_penalty = (((gradients + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
-        return gradient_penalty, gradients
+        gradients0 = gradients[0].view(real_image.size(0), -1)  # flat the data
+        gradients1 = gradients[1].view(real_wv.size(0), -1)  # flat the data
+        gradient_penalty0 = (((gradients0 + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
+        gradient_penalty1 = (((gradients1 + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
+        gradient_penalty = gradient_penalty0 + gradient_penalty1
+        return gradient_penalty, gradients0, gradients1
     else:
         return 0.0, None
 
@@ -163,6 +177,7 @@ def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
 
 def words2image(text_list, config):
+    
 
     w = config.IMAGE_WIDTH
     h = config.IMAGE_HEIGHT
@@ -174,7 +189,7 @@ def words2image(text_list, config):
     ## Look for fonts
     for font in config.FONTS:
         try:
-            font = ImageFont.truetype(font, 9)
+            font = ImageFont.truetype(font, config.FONT_SIZE)
         except OSError:
             continue
     
@@ -204,3 +219,61 @@ def words2image(text_list, config):
         raise NotImplementedError
 
     return np.array(img.convert('RGB'))
+
+def iter_graph(root, callback):
+    queue = [root]
+    seen = set()
+    while queue:
+        fn = queue.pop()
+        if fn in seen:
+            continue
+        seen.add(fn)
+        for next_fn, _ in fn.next_functions:
+            if next_fn is not None:
+                queue.append(next_fn)
+        callback(fn)
+
+def register_hooks(var):
+    fn_dict = {}
+    def hook_cb(fn):
+        def register_grad(grad_input, grad_output):
+            fn_dict[fn] = grad_input
+        fn.register_hook(register_grad)
+    iter_graph(var.grad_fn, hook_cb)
+
+    def is_bad_grad(grad_output):
+        grad_output = grad_output.data
+        return grad_output.ne(grad_output).any() or grad_output.gt(1e6).any()
+
+    def make_dot():
+        node_attr = dict(style='filled',
+                        shape='box',
+                        align='left',
+                        fontsize='12',
+                        ranksep='0.1',
+                        height='0.2')
+        dot = Digraph(node_attr=node_attr, graph_attr=dict(size="12,12"))
+
+        def size_to_str(size):
+            return '('+(', ').join(map(str, size))+')'
+
+        def build_graph(fn):
+            if hasattr(fn, 'variable'):  # if GradAccumulator
+                u = fn.variable
+                node_name = 'Variable\n ' + size_to_str(u.size())
+                dot.node(str(id(u)), node_name, fillcolor='lightblue')
+            else:
+                assert fn in fn_dict, fn
+                fillcolor = 'white'
+                if any(is_bad_grad(gi) for gi in fn_dict[fn]):
+                    fillcolor = 'red'
+                dot.node(str(id(fn)), str(type(fn).__name__), fillcolor=fillcolor)
+            for next_fn, _ in fn.next_functions:
+                if next_fn is not None:
+                    next_id = id(getattr(next_fn, 'variable', next_fn))
+                    dot.edge(str(next_id), str(id(fn)))
+        iter_graph(var.grad_fn, build_graph)
+
+        return dot
+
+    return make_dot
