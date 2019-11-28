@@ -98,6 +98,7 @@ class GANModel(BaseModel):
         weight_decay = config.WEIGHT_DECAY
         self.lambda_l1 = config.LAMBDA_L1
         self.inv_normalize = config.NORMALIZE
+        self.prob_flip_labels = config.PROB_FLIP_LABELS
 
         ## Init G and D
         self.G = GeneratorResNet(config).to(self.device)
@@ -268,7 +269,7 @@ class GANModel(BaseModel):
 
         return real_real_pair, real_fake_pair, fake_real_pair
 
-    def backward_D(self, rr_pair, rf_pair, fr_pair, update=True):
+    def backward_D(self, rr_pair, rf_pair, fr_pair, update=True, prob_flip_labels=0.0):
 
         ## Open pairs
         real_images, real_wvs = rr_pair
@@ -277,15 +278,15 @@ class GANModel(BaseModel):
 
         # Real-real
         pred_rr = self.D(real_images, real_wvs)
-        self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True)
+        self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True, prob_flip_labels=prob_flip_labels)
 
         ## Real-fake
         pred_rf = self.D(real_images, fake_wvs)
-        self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False)
+        self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
 
         ## Fake-real
         pred_fr = self.D(fake_images.detach(), real_wvs.detach())
-        self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False)
+        self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False, prob_flip_labels=prob_flip_labels)
 
         if self.gan_loss == 'wgangp':
             self.loss_gp_fr, _, _ = get_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
@@ -299,7 +300,7 @@ class GANModel(BaseModel):
         if update:
             self.loss_D.backward()
 
-    def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True):
+    def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True, prob_flip_labels=0.0):
 
         ## Open pair
         fake_images, real_wvs = fr_pair
@@ -307,7 +308,7 @@ class GANModel(BaseModel):
         ## Fake-real
         pred_fr = self.D(fake_images.detach(), real_wvs.detach())
 
-        loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True)
+        loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True, prob_flip_labels=prob_flip_labels)
         loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
         self.loss_G = loss_G_GAN + loss_G_L1
@@ -429,7 +430,7 @@ class GANModel(BaseModel):
             # all_true = np.all([param.requires_grad for param in self.D.parameters()])
             # print("All D parameters have grad:", str(all_true))
             self.D_optimizer.zero_grad()
-            self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D)
+            self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D, prob_flip_labels=self.prob_flip_labels)
             if train_D:
                 self.D_optimizer.step()
 
@@ -437,10 +438,10 @@ class GANModel(BaseModel):
             self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
             self.G = self.set_requires_grad(self.G, train_G)
             self.G_optimizer.zero_grad()
-            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G)
+            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G, prob_flip_labels=self.prob_flip_labels)
             if train_G:
                 self.G_optimizer.step()
 
         else:
-            self.backward_D(rr_pair, rf_pair, fr_pair, update=False)
-            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False)
+            self.backward_D(rr_pair, rf_pair, fr_pair, update=False, prob_flip_labels=0.0)
+            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False, prob_flip_labels=0.0)

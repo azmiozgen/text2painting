@@ -26,7 +26,6 @@ class GANLoss(nn.Module):
         self.gan_mode = gan_mode
         self.device = device
         self.accuracy = accuracy
-        self.prob_flip_labels = 0.05
         if gan_mode == 'lsgan':
             self.loss = nn.MSELoss()
         elif gan_mode == 'vanilla':
@@ -36,21 +35,31 @@ class GANLoss(nn.Module):
         else:
             raise NotImplementedError('GAN mode %s not implemented' % gan_mode)
 
-    def get_target_tensor(self, prediction, target_is_real):
+    def get_target_tensor(self, prediction, target_is_real, prob_flip_labels=0.0):
 
-        is_flip = np.random.rand() < self.prob_flip_labels   ## Flipping real-fake labels
-        if (target_is_real and not is_flip) or (not target_is_real and is_flip):
-            target_tensor = self.real_label.expand_as(prediction)
-            target_tensor_smooth = target_tensor.detach().cpu() - torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+        is_flip = np.random.rand() < prob_flip_labels   ## No flipping real-fake labels
+        if target_is_real:
+            if is_flip:
+                target_tensor = self.fake_label.expand_as(prediction)
+                target_tensor_smooth = target_tensor.detach().cpu() + torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+            else:
+                target_tensor = self.real_label.expand_as(prediction)
+                target_tensor_smooth = target_tensor.detach().cpu() - torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+            target_true_tensor = self.real_label.expand_as(prediction)
         else:
-            target_tensor = self.fake_label.expand_as(prediction)
-            target_tensor_smooth = target_tensor.detach().cpu() + torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
-        return target_tensor, target_tensor_smooth
+            if is_flip:
+                target_tensor = self.real_label.expand_as(prediction)
+                target_tensor_smooth = target_tensor.detach().cpu() - torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+            else:
+                target_tensor = self.fake_label.expand_as(prediction)
+                target_tensor_smooth = target_tensor.detach().cpu() + torch.rand(target_tensor.size()) * 0.1    ## Smooth labels
+            target_true_tensor = self.fake_label.expand_as(prediction)
+        return target_tensor, target_tensor_smooth, target_true_tensor
 
-    def __call__(self, prediction, target_is_real):
+    def __call__(self, prediction, target_is_real, prob_flip_labels=0.0):
 
         ## Compute loss
-        target_tensor, target_tensor_smooth = self.get_target_tensor(prediction, target_is_real)
+        _, target_tensor_smooth, target_true_tensor = self.get_target_tensor(prediction, target_is_real, prob_flip_labels=prob_flip_labels)
         target_tensor_smooth = target_tensor_smooth.to(self.device)
         if self.gan_mode in ['lsgan', 'vanilla']:
             loss = self.loss(prediction, target_tensor_smooth)
@@ -60,7 +69,7 @@ class GANLoss(nn.Module):
         ## Compute accuracy
         if self.accuracy:
             _prediction = prediction.detach().cpu()
-            _target_tensor = target_tensor.detach().cpu()
+            _target_tensor = target_true_tensor.detach().cpu()
             if target_is_real:
                 accuracy = torch.mean(((torch.sigmoid(_prediction) >= 0.5).float() == _target_tensor).float()).item()
             else:
