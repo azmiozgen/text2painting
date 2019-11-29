@@ -227,6 +227,20 @@ class AlignCollate(object):
         else:
             return None
 
+    def _get_word_by_vector(self, word_vector):
+        word_vector = np.array(word_vector)
+        word, prob = self.word2vec_model.wv.similar_by_vector(word_vector, topn=1)[0]
+        if prob > 0.99:
+            return word
+        else:
+            return None
+
+    def _clean_wvs(self, word_vectors):
+        '''
+        Clean word vectors by removing words that are not in vocabulary
+        '''
+        return torch.Tensor(list(filter(self._get_word_by_vector, np.array(word_vectors))))
+
     def _get_similar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
         _top_similar_words = self.word2vec_model.wv.similar_by_vector(word_vector, 
@@ -253,7 +267,8 @@ class AlignCollate(object):
             word_vectors = torch.cat((word_vectors, similar_vector))
 
         return word_vectors
-    
+
+
     def _pad_wvs_with_noise(self, word_vectors):
         '''
         Pad word vectors array with random noise
@@ -266,12 +281,9 @@ class AlignCollate(object):
 
     def _crop_wvs(self, word_vectors):
         '''
-        Crop word vectors array to be equal to sentence length
+        Crop word vectors randomly array to be equal to sentence length
         '''
-        np.random.shuffle(word_vectors)
-        word_vectors = word_vectors[:self.sentence_length]
-
-        return word_vectors
+        return word_vectors[torch.randperm(self.sentence_length)]
 
     def _get_dissimilar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
@@ -302,6 +314,9 @@ class AlignCollate(object):
             img = item[0]
             word_vectors = item[1]
             images.append(self.__preprocess(img))
+
+            ## Clean wvs that are not in vocab
+            # word_vectors = self._clean_wvs(word_vectors)
 
             ## Pad or crop true wvs
             if len(word_vectors) < self.sentence_length:
