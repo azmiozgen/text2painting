@@ -304,61 +304,57 @@ class DiscriminatorLogits(nn.Module):
         return output.view(-1)
 
 
-
-
-
-
 class GeneratorSimple(nn.Module):
-    def __init__(self):
-        super(Generator, self).__init__()
+    def __init__(self, config):
+        super(GeneratorSimple, self).__init__()
         
-        self.main = nn.Sequential(
-            ## 1 x 2000
-            nn.ConvTranspose2d(1 * 2000, 64, kernel_size=4, stride=1, padding=0, bias=False),  
-            ## 64 x 4 x 4
-            nn.BatchNorm2d(64),
+        n_input = config.N_INPUT
+        ngf = config.NGF
+
+        self.conv = nn.Sequential(
+            nn.ConvTranspose2d(n_input, ngf, kernel_size=4, stride=1, padding=0, bias=False),       ## ngf x 4 x 4 
+            nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, kernel_size=4, stride=2, padding=1, bias=False),
-            ## 32 x 8 x 8
-            nn.BatchNorm2d(32),
+            nn.ConvTranspose2d(ngf, ngf // 2, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf // 2 x 8 x 8
+            nn.BatchNorm2d(ngf // 2),
             nn.ReLU(True),
-            nn.ConvTranspose2d(32, 16, kernel_size=4, stride=2, padding=1, bias=False),
-            ## 16 x 16 x 16
-            nn.BatchNorm2d(16),
+            nn.ConvTranspose2d(ngf // 2, ngf // 4, kernel_size=4, stride=2, padding=1, bias=False), ## ngf // 4 x 16 x 16
+            nn.BatchNorm2d(ngf // 4),
             nn.ReLU(True),
-            nn.ConvTranspose2d(16, 8, kernel_size=4, stride=2, padding=1, bias=False),
-            ## 8 x 32 x 32
-            nn.BatchNorm2d(8),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(8, 3, kernel_size=4, stride=2, padding=1, bias=False),
-            ## 3 x 64 x 64
+            nn.ConvTranspose2d(ngf // 4, 3, kernel_size=4, stride=2, padding=1, bias=False),        ## 3 x 32 x 32
+            # nn.BatchNorm2d(ngf // 8),
+            # nn.ReLU(True),
+            # nn.ConvTranspose2d(ngf // 8, 3, kernel_size=4, stride=2, padding=1, bias=False),      ## 3 x 64 x 64
             nn.Tanh()
         )
 
     def forward(self, x):
-        return self.main(x)
+        return self.conv(x)
 
 class DiscriminatorSimple(nn.Module):
-    def __init__(self):
-        super(Discriminator, self).__init__()
-        self.main = nn.Sequential(                                                ## 3 x H x W
-            nn.Conv2d(3, 16, kernel_size=4, stride=2, padding=1, bias=False),     ## 16 x H/2 x W/2
+    def __init__(self, config):
+        super(DiscriminatorSimple, self).__init__()
+
+        n_input = config.N_INPUT
+        ndf = config.NDF
+
+        self.conv = nn.Sequential(                                                       ## 3 x H x W
+            nn.Conv2d(3, ndf, kernel_size=4, stride=2, padding=1, bias=False),           ## ndf x H/2 x W/2
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(16, 32, kernel_size=4, stride=2, padding=1, bias=False),    ## 32 x H/4 x W/4
-            nn.BatchNorm2d(32),
+            nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False),     ## ndf * 2 x H/4 x W/4
+            nn.BatchNorm2d(ndf * 2),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(32, 64, kernel_size=4, stride=2, padding=1, bias=False),    ## 64 x H/8 x W/8
-            nn.BatchNorm2d(64),
+            nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+            nn.BatchNorm2d(ndf * 4),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(64, 128, kernel_size=4, stride=2, padding=1, bias=False),   ## 128 x H/16 x W/16
-            nn.BatchNorm2d(128),
+            nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
+            nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(128, 1, kernel_size=4, stride=1, padding=0, bias=False),    ## 1 x H/64 x W/64
-            nn.Sigmoid()
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/32 x W/32
         )
 
-    def forward(self, input):
-        return self.main(input)
+    def forward(self, x):
+        return self.conv(x)
 
 # class Discriminator(nn.Module):
 #     def __init__(self, config):
