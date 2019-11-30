@@ -98,30 +98,41 @@ class GeneratorResNet(nn.Module):
                                    norm_layer(ngf),
                                    nn.ReLU(True))             # -> ngf x H x W
 
-        blocks = []
-        for i in range(n_blocks):       # add ResNet blocks
-            blocks += [ResnetBlock(ngf, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
-        self.blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
+        def build_blocks(channel, n_blocks):
+            blocks = []
+            for i in range(n_blocks):       # add ResNet blocks
+                blocks += [ResnetBlock(channel, padding_type=padding_type, norm_layer=norm_layer, use_dropout=use_dropout, use_bias=use_bias)]
+            blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
+            return blocks
 
+        self.block1 = build_blocks(ngf, n_blocks * 6)
         self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x H x W -> ngf/2 x 2H x 2W
+        self.block2 = build_blocks(ngf // 2, n_blocks)
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
+        self.block3 = build_blocks(ngf // 4, n_blocks)
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
-        # self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        self.block4 = build_blocks(ngf // 8, n_blocks)
+        self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
+        self.block5 = build_blocks(ngf // 16, n_blocks)
         # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
         
         self.finish = nn.Sequential(nn.ReflectionPad2d(3),
-                                    nn.Conv2d(ngf // 8, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Conv2d(ngf // 16, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
                                     nn.Tanh())
 
     def forward(self, word_vectors):
         out = self.fc(word_vectors)
         out = out.view(-1, self.ngf, 4, 4)
         out = self.start(out)
-        out = self.blocks(out)
+        out = self.block1(out)
         out = self.upsample1(out)
+        out = self.block2(out)
         out = self.upsample2(out)
+        out = self.block3(out)
         out = self.upsample3(out)
-        # out = self.upsample4(out)
+        out = self.block4(out)
+        out = self.upsample4(out)
+        out = self.block5(out)
         # out = self.upsample5(out)
         out = self.finish(out)
 
@@ -312,19 +323,19 @@ class GeneratorSimple(nn.Module):
         ngf = config.NGF
 
         self.conv = nn.Sequential(
-            nn.ConvTranspose2d(n_input, ngf, kernel_size=4, stride=1, padding=0, bias=False),       ## ngf x 4 x 4 
+            nn.ConvTranspose2d(n_input, ngf * 8, kernel_size=4, stride=1, padding=0, bias=False),       ## ngf * 8 x 4 x 4 
+            nn.BatchNorm2d(ngf * 8),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf * 4 x 8 x 8
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False),  ## ngf * 2 x 16 x 16
+            nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(ngf * 2, ngf, kernel_size=4, stride=2, padding=1, bias=False),        ## 3 x 32 x 32
             nn.BatchNorm2d(ngf),
             nn.ReLU(True),
-            nn.ConvTranspose2d(ngf, ngf // 2, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf // 2 x 8 x 8
-            nn.BatchNorm2d(ngf // 2),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf // 2, ngf // 4, kernel_size=4, stride=2, padding=1, bias=False), ## ngf // 4 x 16 x 16
-            nn.BatchNorm2d(ngf // 4),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(ngf // 4, 3, kernel_size=4, stride=2, padding=1, bias=False),        ## 3 x 32 x 32
-            # nn.BatchNorm2d(ngf // 8),
-            # nn.ReLU(True),
-            # nn.ConvTranspose2d(ngf // 8, 3, kernel_size=4, stride=2, padding=1, bias=False),      ## 3 x 64 x 64
+            nn.ConvTranspose2d(ngf, 3, kernel_size=4, stride=2, padding=1, bias=False),     ## 3 x 64 x 64
             nn.Tanh()
         )
 
