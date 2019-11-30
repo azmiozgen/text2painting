@@ -182,9 +182,9 @@ class AlignCollate(object):
             image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
             ## Pad or crop_lr image with low prob.
-            if np.random.rand() < 0.05:
+            if np.random.rand() < 0.005:
                 image = pad_image(image)
-            elif np.random.rand() < 0.1:
+            elif np.random.rand() < 0.01:
                 image = crop_edges_lr(image)
 
             if self.random_resolution:
@@ -220,6 +220,15 @@ class AlignCollate(object):
             image = to_tensor(image)
 
         return image
+
+    def _normalize_wvs(self, wv_tensor):
+        '''
+        Normalize word vectors into [-1, 1]
+        '''
+        shifted = wv_tensor - wv_tensor.min()
+        norm = shifted / ((shifted).max() + 1e-10)
+        return norm * 2 - 1
+        # return norm
 
     def _get_word_vector(self, word):
         if self.word2vec_model.wv.vocab.get(word):
@@ -314,6 +323,7 @@ class AlignCollate(object):
             img = item[0]
             word_vectors = item[1]
             images.append(self.__preprocess(img))
+            word_vectors = self._normalize_wvs(word_vectors)
 
             ## Clean wvs that are not in vocab
             # word_vectors = self._clean_wvs(word_vectors)
