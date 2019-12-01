@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorPixel, DiscriminatorStackGAN1
+from .arch import GeneratorSimple, GeneratorResNet, DiscriminatorSimple, DiscriminatorStack
 from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities, register_hooks
 
 class BaseModel(ABC):
@@ -100,17 +100,19 @@ class GANModel(BaseModel):
         self.inv_normalize = config.NORMALIZE
         self.prob_flip_labels = config.PROB_FLIP_LABELS
 
-        ## Init G and D
+        ## Init G
         self.G = GeneratorResNet(config).to(self.device)
+        # self.G = GeneratorSimple(config).to(self.device)
 
-        ## Init networks and optimizers
+        ## Init D, optimizers, schedulers
         if mode == 'train':
-            # self.D = DiscriminatorPixel(config).to(self.device)
-            self.D = DiscriminatorStackGAN1(config).to(self.device)
+            self.D = DiscriminatorStack(config).to(self.device)
+            # self.D = DiscriminatorSimple(config).to(self.device)
 
             self.G_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
-            self.criterionL1 = torch.nn.L1Loss()
+            # self.G_criterion_dist = torch.nn.L1Loss()
+            self.G_criterion_dist = torch.nn.MSELoss()
             self.G_optimizer = torch.optim.Adam(self.G.parameters(),
                                                 lr=lr,
                                                 betas=(beta, 0.999),
@@ -124,14 +126,15 @@ class GANModel(BaseModel):
                                                                              mode='min',
                                                                              factor=0.75,
                                                                              threshold=0.01,
-                                                                             patience=10)
+                                                                             patience=100)
 
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
                                                                              factor=0.75,
                                                                              threshold=0.01,
-                                                                             patience=10)
+                                                                             patience=100)
 
+        ## Parallelize over gpus
         if torch.cuda.device_count() > 1:
             self.G = torch.nn.DataParallel(self.G)
             self.D = torch.nn.DataParallel(self.D)
@@ -172,6 +175,8 @@ class GANModel(BaseModel):
 
         # print(self.G)
         # print(self.D)
+        print("# parameters of G: {:2E}".format(sum(p.numel() for p in self.G.parameters())))
+        print("# parameters of D: {:2E}".format(sum(p.numel() for p in self.D.parameters())))
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
@@ -278,27 +283,37 @@ class GANModel(BaseModel):
 
         # Real-real
         pred_rr = self.D(real_images, real_wvs)
+        # pred_rr = self.D(real_images)
         self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True, prob_flip_labels=prob_flip_labels)
+        if update:
+            self.loss_D_rr.backward()
 
-        ## Real-fake
-        pred_rf = self.D(real_images, fake_wvs)
+        # ## Real-fake
+        pred_rf = self.D(real_images.detach(), fake_wvs.detach())
         self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        # if update:
+            # self.loss_D_rf.backward()
 
         ## Fake-real
         pred_fr = self.D(fake_images.detach(), real_wvs.detach())
+        # pred_fr = self.D(fake_images.detach())
         self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        if update:
+            self.loss_D_fr.backward()
 
         if self.gan_loss == 'wgangp':
             self.loss_gp_fr, _, _ = get_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
+            # self.loss_gp_fr, _ = get_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
+            #                                        type='mixed', constant=1.0, lambda_gp=10.0)
             self.loss_gp_rf, _, _ = get_gradient_penalty(self.D, rr_pair, rf_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
-            self.loss_gp_fr.backward(retain_graph=True)
-            self.loss_gp_rf.backward(retain_graph=True)
+            if update:
+                self.loss_gp_fr.backward(retain_graph=True)
+                self.loss_gp_rf.backward(retain_graph=True)
 
         self.loss_D = self.loss_D_rr + (self.loss_D_rf + self.loss_D_fr) * 0.5
-        if update:
-            self.loss_D.backward()
+        # self.loss_D = self.loss_D_rr + self.loss_D_fr
 
     def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True, prob_flip_labels=0.0):
 
@@ -306,14 +321,18 @@ class GANModel(BaseModel):
         fake_images, real_wvs = fr_pair
 
         ## Fake-real
-        pred_fr = self.D(fake_images.detach(), real_wvs.detach())
+        # pred_fr = self.D(fake_images.detach(), real_wvs.detach())
+        pred_fr = self.D(fake_images, real_wvs)
+        # pred_fr = self.D(fake_images)
 
+        loss_G_dist = self.G_criterion_dist(fake_images_tensor, real_images_tensor) * self.lambda_l1
         loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True, prob_flip_labels=prob_flip_labels)
-        loss_G_L1 = self.criterionL1(fake_images_tensor, real_images_tensor) * self.lambda_l1
 
-        self.loss_G = loss_G_GAN + loss_G_L1
         if update:
-            self.loss_G.backward()
+            loss_G_dist.backward(retain_graph=True)
+            loss_G_GAN.backward(retain_graph=True)
+
+        self.loss_G = loss_G_dist + loss_G_GAN
 
     def get_losses(self):
         loss_g = self.loss_G.item() if self.loss_G else -1.0
@@ -400,8 +419,12 @@ class GANModel(BaseModel):
         real_wv_tensor = real_wv_tensor.to(self.device)
 
         ## Forward G
+        # real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1, 1, 1)
         real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1)
+        # noise = torch.randn(self.batch_size, real_wv_flat_tensor.size(1), 1, 1, device=self.device)
+
         fake_images_tensor = self.G(real_wv_flat_tensor)
+        # fake_images_tensor = self.G(noise)
 
         return fake_images_tensor
 

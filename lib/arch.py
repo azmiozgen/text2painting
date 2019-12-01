@@ -188,9 +188,9 @@ class DiscriminatorPixel(nn.Module):
 
         return self.conv(stitched)
 
-class GeneratorStackGAN1(nn.Module):
+class GeneratorStack(nn.Module):
     def __init__(self, config):
-        super(Generator, self).__init__()
+        super(GeneratorStack, self).__init__()
 
         n_input = config.N_INPUT
         ngf = config.NGF * 8
@@ -232,10 +232,9 @@ class GeneratorStackGAN1(nn.Module):
 
         return out
 
-### DO NOT USE BatchNorm in D if WGANGP is used as loss function ###
-class DiscriminatorStackGAN1(nn.Module):
+class DiscriminatorStack(nn.Module):
     def __init__(self, config):
-        super(DiscriminatorStackGAN1, self).__init__()
+        super(DiscriminatorStack, self).__init__()
         ndf = config.NDF
         ngf = config.NGF
         fc_in = config.N_INPUT
@@ -250,69 +249,29 @@ class DiscriminatorStackGAN1(nn.Module):
                         nn.ReLU(True)
                         )
 
-        self.conv = nn.Sequential(                                                    # (4) x H x W
-                                 nn.Conv2d(n_channel, ndf, 4, 2, 1, bias=False),      # (ndf) x H/2 x W/2
-                                 nn.LeakyReLU(0.2, inplace=True),
-                                 nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),        # (ndf * 2) x H/4 x W/4
-                                #  nn.BatchNorm2d(ndf * 2),
-                                #  nn.InstanceNorm2d(ndf * 2),
-                                 nn.LeakyReLU(0.2, inplace=True),
-                                 nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),    # (ndf * 4) x H/4 x W/4
-                                #  nn.BatchNorm2d(ndf * 4),
-                                #  nn.InstanceNorm2d(ndf * 4),
-                                 nn.LeakyReLU(0.2, inplace=True),
-                                 nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),    # (ndf * 8) x H/16 x W/16
-                                #  nn.BatchNorm2d(ndf * 8),
-                                #  nn.InstanceNorm2d(ndf * 8),
-                                 nn.LeakyReLU(0.2, inplace=True),
-                                #  nn.Dropout2d(0.5, True),
-                                 )
-
-        self.get_cond_logits = DiscriminatorLogits(ndf, ngf, bcondition=False)
-        self.get_uncond_logits = None
+        self.conv = nn.Sequential(                                                       ## 3 x H x W
+            nn.Conv2d(n_channel, ndf, kernel_size=4, stride=2, padding=1, bias=False),           ## ndf x H/2 x W/2
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False),     ## ndf * 2 x H/4 x W/4
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/32 x W/32
+        )
 
     def forward(self, image, word_vectors):
         b, _, h, w = image.size()
         wv_out = self.fc(word_vectors)
         wv_out = wv_out.view(b, 1, h, w)
 
-        stitched = torch.cat((image, wv_out), dim=1)
+        stacked = torch.cat((image, wv_out), dim=1)
 
-        return self.conv(stitched)
-
-
-class DiscriminatorLogits(nn.Module):
-    def __init__(self, ndf, ngf, bcondition=True):
-        super(DiscriminatorLogits, self).__init__()
-        self.ndf = ndf
-        self.ngf = ngf
-        self.bcondition = bcondition
-        if bcondition:
-            self.outlogits = nn.Sequential(
-                                          conv3x3(ndf * 8 + ngf, ndf * 8),
-                                          nn.BatchNorm2d(ndf * 8),
-                                        #   nn.InstanceNorm2d(ndf * 8),
-                                          nn.LeakyReLU(0.2, inplace=True),
-                                        #   nn.Dropout2d(0.5, True),
-                                          nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
-                                          )
-        else:
-            self.outlogits = nn.Sequential(
-                                        #   nn.Dropout2d(0.5, True),
-                                          nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=4),
-                                          )
-
-    def forward(self, h_code, c_code=None):
-        # conditioning output
-        if self.bcondition and c_code is not None:
-            c_code = c_code.view(-1, self.ngf, 1, 1)
-            c_code = c_code.repeat(1, 1, 4, 4)
-            h_c_code = torch.cat((h_code, c_code), 1)    # (ngf + ndf) x 4 x 4
-        else:
-            h_c_code = h_code
-
-        output = self.outlogits(h_c_code)
-        return output.view(-1)
+        return self.conv(stacked)
 
 
 class GeneratorSimple(nn.Module):
