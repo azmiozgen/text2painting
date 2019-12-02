@@ -110,15 +110,18 @@ def get_gradient_penalty(netD, real_data, fake_data, device, type='mixed', const
         interpolatesv.requires_grad_(True)
         wv.requires_grad_(True)
         disc_interpolates = netD(interpolatesv, wv)
+        # disc_interpolates = netD(interpolatesv)
         gradients = torch.autograd.grad(outputs=disc_interpolates, inputs=[interpolatesv, wv],
                                         grad_outputs=torch.ones(disc_interpolates.size()).to(device),
                                         create_graph=True, retain_graph=True, only_inputs=True)
-        gradients0 = gradients[0].view(real_image.size(0), -1)  # flat the data
-        gradients1 = gradients[1].view(real_wv.size(0), -1)  # flat the data
+        gradients0 = gradients[0].view(real_image.size(0), -1)
+        gradients1 = gradients[1].view(real_wv.size(0), -1)
         gradient_penalty0 = (((gradients0 + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
         gradient_penalty1 = (((gradients1 + 1e-16).norm(2, dim=1) - constant) ** 2).mean() * lambda_gp        # added eps
         gradient_penalty = gradient_penalty0 + gradient_penalty1
+        # gradient_penalty = gradient_penalty0
         return gradient_penalty, gradients0, gradients1
+        # return gradient_penalty, gradients0
     else:
         return 0.0, None
 
