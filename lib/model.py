@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import GeneratorSimple, GeneratorResNet, DiscriminatorSimple, DiscriminatorStack
+from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefiner
 from .utils import GANLoss, get_gradient_penalty, get_uuid, words2image, ImageUtilities, register_hooks
 
 class BaseModel(ABC):
@@ -103,6 +103,7 @@ class GANModel(BaseModel):
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
         # self.G = GeneratorSimple(config).to(self.device)
+        self.G_refiner = GeneratorRefiner(config).to(self.device)
 
         ## Init D, optimizers, schedulers
         if mode == 'train':
@@ -111,13 +112,19 @@ class GANModel(BaseModel):
 
             self.G_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
-            # self.G_criterion_dist = torch.nn.L1Loss()
+            self.G_refiner_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
             self.G_criterion_dist = torch.nn.MSELoss()
+            self.G_refiner_criterion_dist = torch.nn.MSELoss()
+
             self.G_optimizer = torch.optim.Adam(self.G.parameters(),
                                                 lr=lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
             self.D_optimizer = torch.optim.Adam(self.D.parameters(),
+                                                lr=lr,
+                                                betas=(beta, 0.999),
+                                                weight_decay=weight_decay)
+            self.G_refiner_optimizer = torch.optim.Adam(self.G_refiner.parameters(),
                                                 lr=lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
@@ -134,10 +141,17 @@ class GANModel(BaseModel):
                                                                              threshold=0.01,
                                                                              patience=100)
 
+            self.G_refiner_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_refiner_optimizer, 
+                                                                                     mode='min',
+                                                                                     factor=0.75,
+                                                                                     threshold=0.01,
+                                                                                     patience=100)
+
         ## Parallelize over gpus
         if torch.cuda.device_count() > 1:
             self.G = torch.nn.DataParallel(self.G)
             self.D = torch.nn.DataParallel(self.D)
+            self.G_refiner = torch.nn.DataParallel(self.G_refiner)
 
         ## Init things (these will get values later) 
         self.state_dict = {
@@ -147,15 +161,20 @@ class GANModel(BaseModel):
                           'd' : None,
                           'd_optim' : None,
                           'd_lr_scheduler' : None,
+                          'g_refiner' : None,
+                          'g_refiner_optim' : None,
+                          'g_refiner_lr_scheduler' : None,
                           }
         self.epoch = 1
         self.loss_G = None
         self.loss_D = None
+        self.loss_G_refiner = None
         self.loss_gp_fr = None
         self.loss_gp_rf = None
         self.accuracy_D_rr = 0.0
         self.accuracy_D_rf = 0.0
         self.accuracy_D_fr = 0.0
+        self.accuracy_D_refined_fr = 0.0
         self.model_dir = None
         self.train_log_file = None
         self.val_log_file = None
@@ -172,16 +191,19 @@ class GANModel(BaseModel):
 
         G_lr = self.G_optimizer.param_groups[0]['lr']
         D_lr = self.D_optimizer.param_groups[0]['lr']
+        G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
 
         # print(self.G)
         # print(self.D)
         print("# parameters of G: {:2E}".format(sum(p.numel() for p in self.G.parameters())))
         print("# parameters of D: {:2E}".format(sum(p.numel() for p in self.D.parameters())))
+        print("# parameters of G refiner: {:2E}".format(sum(p.numel() for p in self.G_refiner.parameters())))
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
         print("\tGAN loss:", self.gan_loss)
-        print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
+        # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
+        print("\tLearning rates (G, D, G_refiner): {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
@@ -192,28 +214,36 @@ class GANModel(BaseModel):
 
         state = torch.load(model_file)
         self.G.load_state_dict(state['g'])
+        self.G_refiner.load_state_dict(state['g_refiner'])
         if self.mode == 'train':
-            self.G_optimizer.load_state_dict(state['g_optim'])
             self.D.load_state_dict(state['d'])
+            self.G_optimizer.load_state_dict(state['g_optim'])
             self.D_optimizer.load_state_dict(state['d_optim'])
+            self.G_refiner_optimizer.load_state_dict(state['g_refiner_optim'])
             self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
             self.D_lr_scheduler.load_state_dict(state['d_lr_scheduler'])
+            self.G_refiner_lr_scheduler.load_state_dict(state['g_refiner_lr_scheduler'])
         if self.reset_lr:
             self.G_optimizer.param_groups[0]['lr'] = self.config.LR
             self.D_optimizer.param_groups[0]['lr'] = self.config.LR
+            self.G_refiner_optimizer.param_groups[0]['lr'] = self.config.LR
         self.set_state_dict()
 
     def set_state_dict(self):
         self.state_dict['g'] = self.G.state_dict()
+        self.state_dict['g_refiner'] = self.G_refiner.state_dict()
         if self.mode == 'train':
-            self.state_dict['g_optim'] = self.G_optimizer.state_dict()
-            self.state_dict['g_lr_scheduler'] = self.G_lr_scheduler.state_dict()
             self.state_dict['d'] = self.D.state_dict()
+            self.state_dict['g_optim'] = self.G_optimizer.state_dict()
             self.state_dict['d_optim'] = self.D_optimizer.state_dict()
+            self.state_dict['g_refiner_optim'] = self.G_refiner_optimizer.state_dict()
+            self.state_dict['g_lr_scheduler'] = self.G_lr_scheduler.state_dict()
             self.state_dict['d_lr_scheduler'] = self.D_lr_scheduler.state_dict()
+            self.state_dict['g_refiner_lr_scheduler'] = self.G_refiner_lr_scheduler.state_dict()
 
-    def save_model_dict(self, epoch, iteration, loss_g, loss_d):
-        model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
+    def save_model_dict(self, epoch, iteration, loss_g, loss_d, loss_g_refiner):
+        # model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d)
+        model_filename = "{}_{:04}_{:08}_{:.4f}_{:.4f}_{:.4f}.pth".format(self.model_name, epoch, iteration, loss_g, loss_d, loss_g_refiner)
         model_file = os.path.join(self.model_dir, model_filename)
         self.set_state_dict()
         torch.save(self.state_dict, model_file)
@@ -250,9 +280,11 @@ class GANModel(BaseModel):
                 f.write(self.log_header + '\n')
 
     def save_logs(self, log_tuple):
-        phase, epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr = log_tuple
+        # phase, epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr = log_tuple
+        phase, epoch, iteration, loss_g, loss_d, loss_g_refiner, acc_rr, acc_rf, acc_fr, acc_refined_fr = log_tuple
         log_file = self.train_log_file if phase == 'train' else self.val_log_file
-        log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr)
+        # log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d, acc_rr, acc_rf, acc_fr)
+        log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(epoch, iteration, loss_g, loss_d, loss_g_refiner, acc_rr, acc_rf, acc_fr, acc_refined_fr)
         with open(log_file, 'a') as f:
             f.write(log_row_str)
 
@@ -261,45 +293,54 @@ class GANModel(BaseModel):
             param.requires_grad = requires_grad
         return net
 
-    def set_inputs(self, data, fake_images_tensor):
-        real_images_tensor, real_wv_tensor, fake_wv_tensor = data
-        b = real_wv_tensor.size(0)
-        real_wv_tensor = real_wv_tensor.view(b, -1)
-        fake_wv_tensor = fake_wv_tensor.view(b, -1)
+    def set_inputs(self, data, fake_images, refined):
+        real_images, real_wv, fake_wv = data
+
+        real_wv = real_wv.view(self.batch_size, -1)
+        fake_wv = fake_wv.view(self.batch_size, -1)
 
         ## Make pairs
-        real_real_pair = (real_images_tensor, real_wv_tensor)
-        real_fake_pair = (real_images_tensor, fake_wv_tensor)
-        fake_real_pair = (fake_images_tensor, real_wv_tensor)
+        real_real_pair = (real_images, real_wv)
+        real_fake_pair = (real_images, fake_wv)
+        fake_real_pair = (fake_images, real_wv)
+        refined_real_pair = (refined, real_wv)
 
-        return real_real_pair, real_fake_pair, fake_real_pair
+        return real_real_pair, real_fake_pair, fake_real_pair, refined_real_pair
 
-    def backward_D(self, rr_pair, rf_pair, fr_pair, update=True, prob_flip_labels=0.0):
+    def backward_D(self, rr_pair, rf_pair, fr_pair, fr_refined_pair, update=True, prob_flip_labels=0.0, classic=True):
 
         ## Open pairs
         real_images, real_wvs = rr_pair
-        real_images, fake_wvs = rf_pair
-        fake_images, real_wvs = fr_pair
+        _, fake_wvs = rf_pair
+        fake_images, _ = fr_pair
+        refined, _ = fr_refined_pair
 
         # Real-real
         pred_rr = self.D(real_images, real_wvs)
         # pred_rr = self.D(real_images)
-        self.loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True, prob_flip_labels=prob_flip_labels)
+        loss_D_rr, self.accuracy_D_rr = self.D_criterionGAN(pred_rr, target_is_real=True, prob_flip_labels=prob_flip_labels)
+        # if update and classic:
         if update:
-            self.loss_D_rr.backward()
-
-        # ## Real-fake
-        pred_rf = self.D(real_images.detach(), fake_wvs.detach())
-        self.loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
-        # if update:
-            # self.loss_D_rf.backward()
+            loss_D_rr.backward()
 
         ## Fake-real
-        pred_fr = self.D(fake_images.detach(), real_wvs.detach())
+        pred_fr = self.D(fake_images.detach(), real_wvs)
         # pred_fr = self.D(fake_images.detach())
-        self.loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False, prob_flip_labels=prob_flip_labels)
-        if update:
-            self.loss_D_fr.backward()
+        loss_D_fr, self.accuracy_D_fr = self.D_criterionGAN(pred_fr, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        if update and classic:
+            loss_D_fr.backward()
+
+        ## Real-fake
+        pred_rf = self.D(real_images, fake_wvs)
+        loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        # if update and not classic:
+        #     loss_D_rf.backward()
+
+        ## Fake refined-real
+        pred_refined_fr = self.D(refined.detach(), real_wvs)
+        loss_D_refined_fr, self.accuracy_D_refined_fr = self.D_criterionGAN(pred_refined_fr, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        if update and not classic:
+            loss_D_refined_fr.backward()
 
         if self.gan_loss == 'wgangp':
             self.loss_gp_fr, _, _ = get_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
@@ -312,10 +353,11 @@ class GANModel(BaseModel):
                 self.loss_gp_fr.backward(retain_graph=True)
                 self.loss_gp_rf.backward(retain_graph=True)
 
-        self.loss_D = self.loss_D_rr + (self.loss_D_rf + self.loss_D_fr) * 0.5
+        # self.loss_D = loss_D_rr + (loss_D_rf + loss_D_fr) / 2
+        self.loss_D = loss_D_rr + (loss_D_rf + loss_D_fr + loss_D_refined_fr) / 3
         # self.loss_D = self.loss_D_rr + self.loss_D_fr
 
-    def backward_G(self, fr_pair, real_images_tensor, fake_images_tensor, update=True, prob_flip_labels=0.0):
+    def backward_G(self, fr_pair, real_images, update=True, prob_flip_labels=0.0):
 
         ## Open pair
         fake_images, real_wvs = fr_pair
@@ -325,46 +367,75 @@ class GANModel(BaseModel):
         pred_fr = self.D(fake_images, real_wvs)
         # pred_fr = self.D(fake_images)
 
-        loss_G_dist = self.G_criterion_dist(fake_images_tensor, real_images_tensor) * self.lambda_l1
+        loss_G_dist = self.G_criterion_dist(fake_images, real_images) * self.lambda_l1
         loss_G_GAN, _ = self.G_criterionGAN(pred_fr, target_is_real=True, prob_flip_labels=prob_flip_labels)
 
         if update:
+            # loss_G_dist.backward(retain_graph=True)
+            # loss_G_GAN.backward(retain_graph=True)
             loss_G_dist.backward(retain_graph=True)
             loss_G_GAN.backward(retain_graph=True)
 
         self.loss_G = loss_G_dist + loss_G_GAN
 
+    def backward_G_refiner(self, fr_refined_pair, real_images, update=True, prob_flip_labels=0.0):
+
+        ## Open pair
+        refined, real_wvs = fr_refined_pair
+
+        ## Fake-real
+        # pred_fr = self.D(fake_images.detach(), real_wvs.detach())
+        pred_refined_fr = self.D(refined, real_wvs)
+        # pred_fr = self.D(fake_images)
+
+        loss_G_refiner_dist = self.G_refiner_criterion_dist(refined, real_images) * self.lambda_l1
+        # loss_G_refiner_GAN, _ = self.G_refiner_criterionGAN(pred_refined_fr, target_is_real=True, prob_flip_labels=prob_flip_labels)
+
+        if update:
+            loss_G_refiner_dist.backward(retain_graph=True)
+            # loss_G_refiner_GAN.backward(retain_graph=True)
+
+        # self.loss_G_refiner = loss_G_refiner_dist + loss_G_refiner_GAN
+        self.loss_G_refiner = loss_G_refiner_dist
+
     def get_losses(self):
         loss_g = self.loss_G.item() if self.loss_G else -1.0
         loss_d = self.loss_D.item() if self.loss_D else -1.0
+        loss_g_refiner = self.loss_G_refiner.item() if self.loss_G_refiner else -1.0
         loss_gp_fr = self.loss_gp_fr.item() if self.loss_gp_fr else -1.0
         loss_gp_rf = self.loss_gp_rf.item() if self.loss_gp_rf else -1.0
-        return loss_g, loss_d, loss_gp_fr, loss_gp_rf
+        # return loss_g, loss_d, loss_gp_fr, loss_gp_rf
+        return loss_g, loss_d, loss_g_refiner, loss_gp_fr, loss_gp_rf
 
     def get_D_accuracy(self):
-        return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr)
+        # return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr)
+        return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr, self.accuracy_D_refined_fr)
 
     def update_lr(self):
         self.G_lr_scheduler.step(0)
         self.D_lr_scheduler.step(0)
         D_lr = self.G_optimizer.param_groups[0]['lr']
         G_lr = self.D_optimizer.param_groups[0]['lr']
+        G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
 
         print('\t\t(G learning rate is {:.4E})'.format(G_lr))
         print('\t\t(D learning rate is {:.4E})'.format(D_lr))
+        print('\t\t(G_refiner learning rate is {:.4E})'.format(G_refiner_lr))
 
-    def generate_grid(self, real_wv_tensor, real_images_tensor, word2vec_model):
+    def generate_grid(self, real_wvs, real_images, word2vec_model):
         ## Generate fake image
-        fake_images_tensor = self.forward(real_wv_tensor)
+        real_wvs_flat = real_wvs.view(self.batch_size, -1)
+        fake_images = self.forward(self.G, real_wvs_flat)
+        refined = self.forward(self.G_refiner, fake_images)
 
         images_bag = []
-        for fake_image, real_image, real_wvs in zip(fake_images_tensor, real_images_tensor, real_wv_tensor):
+        for fake_image, real_image, real_wv, _refined in zip(fake_images, real_images, real_wvs, refined):
             words = []
 
             ## Get words from word vectors
-            for real_wv in real_wvs:
-                real_wv = np.array(real_wv)
-                word, _ = word2vec_model.wv.similar_by_vector(real_wv)[0]
+            for _real_wv in real_wv:
+                _real_wv = np.array(_real_wv)
+                word, _ = word2vec_model.wv.similar_by_vector(_real_wv)[0]
                 words.append(word)
 
             ## Unique words are visualized by converting into image
@@ -375,12 +446,14 @@ class GANModel(BaseModel):
             if self.inv_normalize:
                 fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
                 real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
+                _refined = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined)
 
             ## Go to cpu numpy array
             fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
             real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
+            _refined = _refined.detach().cpu().numpy().transpose(1, 2, 0)
 
-            images_bag.extend([word_image, fake_image, real_image])
+            images_bag.extend([word_image, fake_image, _refined, real_image])
 
         images_bag = np.array(images_bag)
         grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=self.config.N_GRID_ROW).permute(1, 2, 0)
@@ -414,37 +487,40 @@ class GANModel(BaseModel):
                 return
             D_dot.save(D_output_file)
 
-    def forward(self, real_wv_tensor):
+    # def forward(self, real_wv):
+    #     ## Data to device
+    #     real_wv = real_wv.to(self.device)
+
+    #     ## Forward G
+    #     # real_wv_flat = real_wv.view(self.batch_size, -1, 1, 1)
+    #     real_wv_flat = real_wv.view(self.batch_size, -1)
+    #     # noise = torch.randn(self.batch_size, real_wv_flat.size(1), 1, 1, device=self.device)
+
+    #     fake_images = self.G(real_wv_flat)
+    #     # fake_images = self.G(noise)
+
+    #     return fake_images
+
+    def forward(self, net, x):
+        return net(x)
+
+    def fit(self, data, phase='train', train_D=True, train_G=True, classic=True):
         ## Data to device
-        real_wv_tensor = real_wv_tensor.to(self.device)
+        real_images, real_wv, fake_wv = data
+        real_images = real_images.to(self.device)
+        real_wv = real_wv.to(self.device)
+        fake_wv = fake_wv.to(self.device)
+        data = real_images, real_wv, fake_wv
 
         ## Forward G
-        # real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1, 1, 1)
-        real_wv_flat_tensor = real_wv_tensor.view(self.batch_size, -1)
-        # noise = torch.randn(self.batch_size, real_wv_flat_tensor.size(1), 1, 1, device=self.device)
+        real_wv_flat = real_wv.view(self.batch_size, -1)
+        fake_images = self.forward(self.G, real_wv_flat)
 
-        fake_images_tensor = self.G(real_wv_flat_tensor)
-        # fake_images_tensor = self.G(noise)
+        ## Forward G_refiner
+        refined = self.forward(self.G_refiner, fake_images)
 
-        return fake_images_tensor
-
-    def fit(self, data, phase='train', train_D=True, train_G=True):
-        ## Data to device
-        real_images_tensor, real_wv_tensor, fake_wv_tensor = data
-        real_images_tensor = real_images_tensor.to(self.device)
-        real_wv_tensor = real_wv_tensor.to(self.device)
-        fake_wv_tensor = fake_wv_tensor.to(self.device)
-        data = real_images_tensor, real_wv_tensor, fake_wv_tensor
-
-        ## Forward G
-        fake_images_tensor = self.forward(fake_wv_tensor)
-        # print("G output:", fake_images_tensor.shape)
-
-        ## Stich images and word vectors on channel axis
-        rr_pair, rf_pair, fr_pair = self.set_inputs(data, fake_images_tensor)
-        # print("Real-real pair:", rr_pair.shape)
-        # print("Real-fake pair:", rf_pair.shape)
-        # print("Fake-real pair:", fr_pair.shape)
+        ## Make input pairs
+        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined)
 
         if phase == 'train':
 
@@ -453,7 +529,8 @@ class GANModel(BaseModel):
             # all_true = np.all([param.requires_grad for param in self.D.parameters()])
             # print("All D parameters have grad:", str(all_true))
             self.D_optimizer.zero_grad()
-            self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D, prob_flip_labels=self.prob_flip_labels)
+            self.backward_D(rr_pair, rf_pair, fr_pair, fr_refined_pair, 
+                            update=train_D, prob_flip_labels=self.prob_flip_labels, classic=classic)
             if train_D:
                 self.D_optimizer.step()
 
@@ -461,10 +538,18 @@ class GANModel(BaseModel):
             self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
             self.G = self.set_requires_grad(self.G, train_G)
             self.G_optimizer.zero_grad()
-            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=train_G, prob_flip_labels=self.prob_flip_labels)
+            self.backward_G(fr_pair, real_images, update=train_G, prob_flip_labels=self.prob_flip_labels)
             if train_G:
                 self.G_optimizer.step()
 
+            ## Update G_refiner
+            self.G_refiner = self.set_requires_grad(self.G_refiner, train_G)
+            self.G_refiner_optimizer.zero_grad()
+            self.backward_G_refiner(fr_refined_pair, real_images, update=train_G, prob_flip_labels=self.prob_flip_labels)
+            if train_G:
+                self.G_refiner_optimizer.step()
+
         else:
             self.backward_D(rr_pair, rf_pair, fr_pair, update=False, prob_flip_labels=0.0)
-            self.backward_G(fr_pair, real_images_tensor, fake_images_tensor, update=False, prob_flip_labels=0.0)
+            self.backward_G(fr_pair, real_images, update=False, prob_flip_labels=0.0)
+            self.backward_G_refiner(fr_refined_pair, real_images, update=False, prob_flip_labels=0.0)

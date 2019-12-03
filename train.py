@@ -85,6 +85,7 @@ if __name__ == "__main__":
             total_acc_rf = 0.0
             total_acc_fr = 0.0
             total_acc_refined_fr = 0.0
+            classic = True if epoch % 2 == 1 else False   ## Backward D rule
 
             if phase == 'train':
 
@@ -115,7 +116,7 @@ if __name__ == "__main__":
                 batch_size = real_images.size()[0]
 
                 ## Fit batch
-                model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
+                model.fit(data, phase=phase, train_D=train_D, train_G=train_G, classic=classic)
 
                 ## Update total loss
                 loss_g, loss_d, loss_g_refiner, loss_gp_fr, loss_gp_rf = model.get_losses()

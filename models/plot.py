@@ -72,7 +72,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     ## Plot D fake refined-real accuracy
     net_name = 'Discriminator'
     col_name = 'D_refined_fr_acc'
-    plt.subplot(3, 3, 7)
+    plt.subplot(3, 3, 6)
     plt.title("{} fake refined-real accuracy".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Accuracy")
@@ -83,7 +83,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     ## Plot D real-fake accuracy
     net_name = 'Discriminator'
     col_name = 'D_rf_acc'
-    plt.subplot(3, 3, 6)
+    plt.subplot(3, 3, 7)
     plt.title("{} real-fake accuracy".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Accuracy")
@@ -91,7 +91,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     plt.yticks(np.arange(0.0, 1.1, 0.1))
     plt.plot(df['Iteration'], df[col_name])
 
-    plt.subplots_adjust(bottom=0.05, left=0.06, right=0.93, top=0.93, wspace = 0.2, hspace = 0.4)
+    plt.subplots_adjust(bottom=0.05, left=0.07, right=0.93, top=0.93, wspace = 0.25, hspace = 0.4)
     plt.savefig(output_file)
 
 if __name__ == '__main__':

@@ -63,6 +63,7 @@ class Config():
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
         self.NGF = 256
         self.NDF = 96
+        self.NG_REF_F = 128
         self.GAN_LOSS = 'wgangp'   ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 1.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
