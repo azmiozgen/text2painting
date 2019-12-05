@@ -166,6 +166,9 @@ class GeneratorRefiner(nn.Module):
             nn.BatchNorm2d(ngf * 4),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
+            nn.BatchNorm2d(ngf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
         )
 
         def build_blocks(channel, n_blocks):
@@ -180,12 +183,13 @@ class GeneratorRefiner(nn.Module):
         self.upsample2 = upsample_block(ngf * 4, ngf * 2)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf * 2, ngf)      # -> ngf/8 x 8H x 8W
         self.upsample4 = upsample_block(ngf, ngf // 2)     # -> ngf/16 x 16H x 16W
+        self.upsample5 = upsample_block(ngf // 2, ngf // 4)     # -> ngf/16 x 32H x 32W
         # self.block5 = build_blocks(ngf // 2, 1)
 
         self.dropout = nn.Dropout2d(0.2)
         
         self.finish = nn.Sequential(nn.ReflectionPad2d(3),
-                                    nn.Conv2d(ngf // 2, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Conv2d(ngf // 4, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
                                     nn.Tanh())
 
     def forward(self, image):
@@ -195,6 +199,7 @@ class GeneratorRefiner(nn.Module):
         out = self.upsample2(out)
         out = self.upsample3(out)
         out = self.upsample4(out)
+        out = self.upsample5(out)
         out = self.finish(out)
 
         return out

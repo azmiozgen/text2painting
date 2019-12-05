@@ -1,4 +1,4 @@
-model_name=united
+model_name=extreme
 for d in ${model_name}*
 do
     count_pth=`ls ${d}/*pth 2> /dev/null | wc -l`
