@@ -71,9 +71,11 @@ class GANLoss(nn.Module):
             _prediction = prediction.detach().cpu()
             _target_tensor = target_true_tensor.detach().cpu()
             if target_is_real:
-                accuracy = torch.mean(((torch.sigmoid(_prediction) >= 0.5).float() == _target_tensor).float()).item()
+                # accuracy = torch.mean(((torch.sigmoid(_prediction) >= 0.5).float() == _target_tensor).float()).item()
+                accuracy = torch.mean((torch.sigmoid(_prediction) >= 0.5).float()).item()
             else:
-                accuracy = torch.mean(((torch.sigmoid(_prediction) < 0.5).float() == _target_tensor).float()).item()
+                # accuracy = torch.mean(((torch.sigmoid(_prediction) < 0.5).float() == _target_tensor).float()).item()
+                accuracy = torch.mean((torch.sigmoid(_prediction) < 0.5).float()).item()
             return loss, accuracy
 
         return loss, -1.0

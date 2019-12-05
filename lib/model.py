@@ -93,7 +93,8 @@ class GANModel(BaseModel):
         self.log_header = config.LOG_HEADER
 
         self.batch_size = config.BATCH_SIZE
-        self.gan_loss = config.GAN_LOSS
+        self.gan_loss1 = config.GAN_LOSS1
+        self.gan_loss2 = config.GAN_LOSS2
         lr = config.LR
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
@@ -112,10 +113,10 @@ class GANModel(BaseModel):
             # self.D = DiscriminatorSimple(config).to(self.device)
             self.D_decider = DiscriminatorDecider(config).to(self.device)
 
-            self.G_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=False).to(self.device)
-            self.D_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
-            self.G_refiner_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
-            self.D_decider_criterionGAN = GANLoss(self.gan_loss, self.device, accuracy=True).to(self.device)
+            self.G_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=False).to(self.device)
+            self.D_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=True).to(self.device)
+            self.G_refiner_criterionGAN = GANLoss(self.gan_loss2, self.device, accuracy=True).to(self.device)
+            self.D_decider_criterionGAN = GANLoss(self.gan_loss2, self.device, accuracy=True).to(self.device)
             self.G_criterion_dist = torch.nn.MSELoss()
             self.G_refiner_criterion_dist = torch.nn.MSELoss()
 
@@ -223,7 +224,8 @@ class GANModel(BaseModel):
         print("Device:", self.device)
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
-        print("\tGAN loss:", self.gan_loss)
+        print("\tGAN loss1:", self.gan_loss1)
+        print("\tGAN loss2:", self.gan_loss2)
         # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
         print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
         print("\tAdam optimizer beta:", beta)
@@ -374,7 +376,7 @@ class GANModel(BaseModel):
         # if update and not classic:
         #     loss_D_rf.backward()
 
-        if self.gan_loss == 'wgangp':
+        if self.gan_loss1 == 'wgangp':
             self.loss_gp_fr, _, _ = get_paired_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
             self.loss_gp_rf, _, _ = get_paired_gradient_penalty(self.D, rr_pair, rf_pair, self.device,
@@ -403,7 +405,7 @@ class GANModel(BaseModel):
         if update:
             loss_D_decider_fr.backward()
 
-        if self.gan_loss == 'wgangp':
+        if self.gan_loss2 == 'wgangp':
             self.loss_gp_decider_fr, _ = get_single_gradient_penalty(self.D_decider, real_images, refined, self.device,
                                                                      type='mixed', constant=1.0, lambda_gp=10.0)
             if update:

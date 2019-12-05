@@ -113,7 +113,7 @@ class GeneratorResNet(nn.Module):
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
         # self.block4 = build_blocks(ngf // 8, n_blocks // 2)
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
-        # self.block5 = build_blocks(ngf // 16, n_blocks // 2)
+        self.block5 = build_blocks(ngf // 16, n_blocks)
         # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
 
         self.dropout = nn.Dropout2d(0.2)
@@ -131,6 +131,7 @@ class GeneratorResNet(nn.Module):
         out = self.upsample2(out)
         out = self.upsample3(out)
         out = self.upsample4(out)
+        out = self.block5(out)
         # out = self.upsample5(out)
         out = self.finish(out)
 
@@ -158,17 +159,18 @@ class GeneratorRefiner(nn.Module):
 
         self.downsample = nn.Sequential(                                                         ## 3 x H x W
             nn.Conv2d(n_channels, ngf, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf x H/2 x W/2
+            nn.BatchNorm2d(ngf),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False),       ## ngf x H/4 x W/4
             nn.BatchNorm2d(ngf * 2),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ngf * 2, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False),            ## ngf x H/8 x W/8
-            nn.BatchNorm2d(ngf * 4),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
-            nn.BatchNorm2d(ngf * 8),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
+            # nn.BatchNorm2d(ngf * 4),
+            # nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
+            # nn.BatchNorm2d(ngf * 8),
+            # nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
         )
 
         def build_blocks(channel, n_blocks):
@@ -178,19 +180,21 @@ class GeneratorRefiner(nn.Module):
             blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
             return blocks
 
-        self.block1 = build_blocks(ngf * 8, n_blocks // 2)
-        self.upsample1 = upsample_block(ngf * 8, ngf * 4)           # ngf x H x W -> ngf/2 x 2H x 2W
-        self.upsample2 = upsample_block(ngf * 4, ngf * 2)      # -> ngf/4 x 4H x 4W
-        self.upsample3 = upsample_block(ngf * 2, ngf)      # -> ngf/8 x 8H x 8W
-        self.upsample4 = upsample_block(ngf, ngf // 2)     # -> ngf/16 x 16H x 16W
-        self.upsample5 = upsample_block(ngf // 2, ngf // 4)     # -> ngf/16 x 32H x 32W
-        # self.block5 = build_blocks(ngf // 2, 1)
+        self.block1 = build_blocks(ngf * 4, n_blocks)
+        self.upsample1 = upsample_block(ngf * 4, ngf * 2)           # ngf x H x W -> ngf/2 x 2H x 2W
+        self.upsample2 = upsample_block(ngf * 2, ngf)      # -> ngf/4 x 4H x 4W
+        self.upsample3 = upsample_block(ngf, ngf // 2)      # -> ngf/8 x 8H x 8W
+        # self.upsample4 = upsample_block(ngf, ngf // 2)     # -> ngf/16 x 16H x 16W
+        # self.upsample5 = upsample_block(ngf // 2, 3)     # -> ngf/16 x 32H x 32W
+        self.block5 = build_blocks(ngf // 2, n_blocks)
 
         self.dropout = nn.Dropout2d(0.2)
         
-        self.finish = nn.Sequential(nn.ReflectionPad2d(3),
-                                    nn.Conv2d(ngf // 4, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
-                                    nn.Tanh())
+        self.finish = nn.Sequential(
+                                    nn.ReflectionPad2d(3),
+                                    nn.Conv2d(ngf // 2, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                    nn.Tanh()
+                                   )
 
     def forward(self, image):
         out = self.downsample(image)
@@ -198,8 +202,9 @@ class GeneratorRefiner(nn.Module):
         out = self.upsample1(out)
         out = self.upsample2(out)
         out = self.upsample3(out)
-        out = self.upsample4(out)
-        out = self.upsample5(out)
+        # out = self.upsample4(out)
+        # out = self.upsample5(out)
+        out = self.block5(out)
         out = self.finish(out)
 
         return out
@@ -217,9 +222,9 @@ class DiscriminatorStack(nn.Module):
 
         ## No Batch Normalization
         self.fc = nn.Sequential(
-                        nn.Linear(fc_in, fc_out, bias=False),
-                        nn.ReLU(True)
-                        )
+                               nn.Linear(fc_in, fc_out, bias=False),
+                               nn.ReLU(True)
+                               )
 
         self.dropout = nn.Dropout(0.1)
 
@@ -239,7 +244,7 @@ class DiscriminatorStack(nn.Module):
             # nn.BatchNorm2d(ndf * 8),
             # nn.LeakyReLU(0.2, inplace=True),
             # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
-            nn.Dropout2d(0.2)
+            # nn.Dropout2d(0.2)
         )
 
 
@@ -272,7 +277,7 @@ class DiscriminatorDecider(nn.Module):
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
-            nn.Dropout2d(0.2)
+            # nn.Dropout2d(0.2)
             # nn.BatchNorm2d(ndf * 8),
             # nn.LeakyReLU(0.2, inplace=True),
             # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64

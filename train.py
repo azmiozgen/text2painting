@@ -151,7 +151,7 @@ if __name__ == "__main__":
                 # Print logs
                 if i % CONFIG.N_PRINT_BATCH == 0:
                     print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
-                    if CONFIG.GAN_LOSS == 'wgangp':
+                    if CONFIG.GAN_LOSS1 == 'wgangp':
                         print("G loss: {:.4f} | D loss: {:.4f} | G refiner loss: {:.4f} | D decider loss {:.4f}".format(loss_g, loss_d, loss_g_refiner, loss_d_decider), end=' ')
                         print("| GP loss fake-real: {:.4f}".format(loss_gp_fr), end=' ')
                         print("| GP loss real-fake: {:.4f}".format(loss_gp_rf), end=' ')
@@ -183,7 +183,7 @@ if __name__ == "__main__":
             total_acc_fr /= (i + 1)
             total_acc_decider_rr /= (i + 1)
             total_acc_decider_fr /= (i + 1)
-            if CONFIG.GAN_LOSS == 'wgangp':
+            if CONFIG.GAN_LOSS1 == 'wgangp':
                 print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
                 print("| {p} G refiner loss: {:.4f} | {p} D decider loss: {:.4f}".format(total_loss_g_refiner, total_loss_d_decider, p=phase.title()), end=' ')
                 print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')
