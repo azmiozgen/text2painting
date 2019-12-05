@@ -89,7 +89,7 @@ class GeneratorResNet(nn.Module):
 
         self.fc = nn.Sequential(
                                nn.Linear(n_input, ngf * 4 * 4, bias=False),
-                               nn.BatchNorm1d(ngf * 4 * 4),
+                            #    nn.BatchNorm1d(ngf * 4 * 4),
                                nn.ReLU(True)
                                )                              # -> ngf x H x W
 
@@ -105,15 +105,15 @@ class GeneratorResNet(nn.Module):
             blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
             return blocks
 
-        self.block1 = build_blocks(ngf, n_blocks * 6)
+        self.block1 = build_blocks(ngf, n_blocks)
         self.upsample1 = upsample_block(ngf, ngf // 2)           # ngf x H x W -> ngf/2 x 2H x 2W
-        self.block2 = build_blocks(ngf // 2, n_blocks)
+        # self.block2 = build_blocks(ngf // 2, n_blocks // 2)
         self.upsample2 = upsample_block(ngf // 2, ngf // 4)      # -> ngf/4 x 4H x 4W
-        self.block3 = build_blocks(ngf // 4, n_blocks)
+        # self.block3 = build_blocks(ngf // 4, n_blocks // 2)
         self.upsample3 = upsample_block(ngf // 4, ngf // 8)      # -> ngf/8 x 8H x 8W
-        self.block4 = build_blocks(ngf // 8, n_blocks)
+        # self.block4 = build_blocks(ngf // 8, n_blocks // 2)
         self.upsample4 = upsample_block(ngf // 8, ngf // 16)     # -> ngf/16 x 16H x 16W
-        self.block5 = build_blocks(ngf // 16, n_blocks)
+        # self.block5 = build_blocks(ngf // 16, n_blocks // 2)
         # self.upsample5 = upsample_block(ngf // 16, ngf // 32)     # -> ngf/32 x 32H x 32W
 
         self.dropout = nn.Dropout2d(0.2)
@@ -127,18 +127,10 @@ class GeneratorResNet(nn.Module):
         out = out.view(-1, self.ngf, 4, 4)
         out = self.start(out)
         out = self.block1(out)
-        out = self.dropout(out)
         out = self.upsample1(out)
-        # out = self.block2(out)
-        out = self.dropout(out)
         out = self.upsample2(out)
-        # out = self.block3(out)
-        out = self.dropout(out)
         out = self.upsample3(out)
-        # out = self.block4(out)
-        out = self.dropout(out)
         out = self.upsample4(out)
-        # out = self.block5(out)
         # out = self.upsample5(out)
         out = self.finish(out)
 
@@ -183,7 +175,7 @@ class GeneratorRefiner(nn.Module):
             blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
             return blocks
 
-        self.block1 = build_blocks(ngf * 8, n_blocks * 6)
+        self.block1 = build_blocks(ngf * 8, n_blocks // 2)
         self.upsample1 = upsample_block(ngf * 8, ngf * 4)           # ngf x H x W -> ngf/2 x 2H x 2W
         self.upsample2 = upsample_block(ngf * 4, ngf * 2)      # -> ngf/4 x 4H x 4W
         self.upsample3 = upsample_block(ngf * 2, ngf)      # -> ngf/8 x 8H x 8W
@@ -199,13 +191,9 @@ class GeneratorRefiner(nn.Module):
     def forward(self, image):
         out = self.downsample(image)
         out = self.block1(out)
-        out = self.dropout(out)
         out = self.upsample1(out)
-        out = self.dropout(out)
         out = self.upsample2(out)
-        out = self.dropout(out)
         out = self.upsample3(out)
-        out = self.dropout(out)
         out = self.upsample4(out)
         out = self.finish(out)
 
@@ -222,13 +210,13 @@ class DiscriminatorStack(nn.Module):
         self.ndf = ndf
         self.ngf = ngf
 
+        ## No Batch Normalization
         self.fc = nn.Sequential(
                         nn.Linear(fc_in, fc_out, bias=False),
-                        # nn.BatchNorm1d(fc_out),
                         nn.ReLU(True)
                         )
 
-        self.dropout = nn.Dropout2d(0.5)
+        self.dropout = nn.Dropout(0.1)
 
         self.conv = nn.Sequential(                                                       ## 4 x H x W
             nn.Conv2d(n_channel, ndf, kernel_size=4, stride=2, padding=1, bias=False),           ## ndf x H/2 x W/2
@@ -242,7 +230,11 @@ class DiscriminatorStack(nn.Module):
             nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
             nn.BatchNorm2d(ndf * 8),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/32 x W/32
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+            # nn.BatchNorm2d(ndf * 8),
+            # nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
+            nn.Dropout2d(0.2)
         )
 
 
@@ -250,11 +242,39 @@ class DiscriminatorStack(nn.Module):
         b, _, h, w = image.size()
         wv_out = self.fc(word_vectors)
         wv_out = wv_out.view(b, 1, h, w)
+        # wv_out = self.dropout(wv_out)
 
         stacked = torch.cat((image, wv_out), dim=1)
-        stacked = self.dropout(stacked)
 
         return self.conv(stacked)
+
+class DiscriminatorDecider(nn.Module):
+    def __init__(self, config):
+        super(DiscriminatorDecider, self).__init__()
+        ndf = config.ND_DEC_F
+        n_channel = config.N_CHANNELS
+
+        self.conv = nn.Sequential(                                                       ## 3 x H x W
+            nn.Conv2d(n_channel, ndf, kernel_size=4, stride=2, padding=1, bias=False),           ## ndf x H/2 x W/2
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False),     ## ndf * 2 x H/4 x W/4
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+            nn.Dropout2d(0.2)
+            # nn.BatchNorm2d(ndf * 8),
+            # nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
+        )
+
+    def forward(self, image):
+        return self.conv(image)
 
 
 class GeneratorSimple(nn.Module):

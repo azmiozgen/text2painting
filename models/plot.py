@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0.1):
+def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=0.2, D_yticks=0.1):
     assert mode in ['train', 'val'], "{} not available. Choose one of ['train', 'val']".format(mode)
 
     length = len(df.index)
@@ -22,7 +22,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, G_yticks))
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, G_yticks))
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot D loss
@@ -33,7 +33,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, G_yticks))
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, D_yticks))
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot G refiner loss
@@ -44,13 +44,24 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, G_yticks))
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, 2.0))
+    plt.plot(df['Iteration'], df[col_name])
+
+    ## Plot D decider loss
+    net_name = 'Discriminitor decider'
+    col_name = 'D_decider_loss'
+    plt.subplot(3, 3, 4)
+    plt.title("{} loss".format(net_name))
+    plt.xlabel("Iterations")
+    plt.ylabel("Loss")
+    plt.grid()
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, 2.0))
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot D real-real accuracy
     net_name = 'Discriminator'
     col_name = 'D_rr_acc'
-    plt.subplot(3, 3, 4)
+    plt.subplot(3, 3, 5)
     plt.title("{} real-real accuracy".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Accuracy")
@@ -61,19 +72,8 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     ## Plot D fake-real accuracy
     net_name = 'Discriminator'
     col_name = 'D_fr_acc'
-    plt.subplot(3, 3, 5)
-    plt.title("{} fake-real accuracy".format(net_name))
-    plt.xlabel("Iterations")
-    plt.ylabel("Accuracy")
-    plt.grid()
-    plt.yticks(np.arange(0.0, 1.1, 0.1))
-    plt.plot(df['Iteration'], df[col_name])
-
-    ## Plot D fake refined-real accuracy
-    net_name = 'Discriminator'
-    col_name = 'D_refined_fr_acc'
     plt.subplot(3, 3, 6)
-    plt.title("{} fake refined-real accuracy".format(net_name))
+    plt.title("{} fake-real accuracy".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Accuracy")
     plt.grid()
@@ -85,6 +85,28 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2, D_yticks=0
     col_name = 'D_rf_acc'
     plt.subplot(3, 3, 7)
     plt.title("{} real-fake accuracy".format(net_name))
+    plt.xlabel("Iterations")
+    plt.ylabel("Accuracy")
+    plt.grid()
+    plt.yticks(np.arange(0.0, 1.1, 0.1))
+    plt.plot(df['Iteration'], df[col_name])
+
+    ## Plot D fake refined-real accuracy
+    net_name = 'Discriminator'
+    col_name = 'D_decider_rr_acc'
+    plt.subplot(3, 3, 8)
+    plt.title("{} decider real-real accuracy".format(net_name))
+    plt.xlabel("Iterations")
+    plt.ylabel("Accuracy")
+    plt.grid()
+    plt.yticks(np.arange(0.0, 1.1, 0.1))
+    plt.plot(df['Iteration'], df[col_name])
+
+    ## Plot D real-fake accuracy
+    net_name = 'Discriminator'
+    col_name = 'D_decider_fr_acc'
+    plt.subplot(3, 3, 9)
+    plt.title("{} decider fake-real accuracy".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Accuracy")
     plt.grid()

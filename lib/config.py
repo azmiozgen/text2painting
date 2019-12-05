@@ -14,7 +14,7 @@ class Config():
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
         self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, SUBSET + '_word2vec.model')
         self.MODEL_NAME = SUBSET
-        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_refined_fr_acc'
+        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_decider_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_decider_fr_acc'
 
         ## Shapes
         self.SENTENCE_LENGTH = 4
@@ -28,10 +28,8 @@ class Config():
 
         ## Stats (Change w.r.t stats file under data/)
         self.NORMALIZE = True
-        self.MEAN = [0.4395, 0.4016, 0.3927]
-        self.STD = [0.2658, 0.2378, 0.2782]
-        # self.MEAN = [0.4313, 0.6512, 0.5442]
-        # self.STD = [0.2159, 0.2929, 0.2476]
+        self.MEAN = [0.5505, 0.3927, 0.4473]
+        self.STD = [0.2245, 0.2782, 0.3102]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -44,13 +42,13 @@ class Config():
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
-        self.HORIZONTAL_FLIPPING = True
+        self.HORIZONTAL_FLIPPING = False
         self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
-        self.RANDOM_CHANNEL_SWAPPING = True
-        self.RANDOM_GAMMA = True
+        self.RANDOM_CHANNEL_SWAPPING = False
+        self.RANDOM_GAMMA = False
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = True
+        self.RANDOM_RESOLUTION = False
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
@@ -61,18 +59,19 @@ class Config():
 
         ## GAN options
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
-        self.NGF = 256
-        self.NDF = 96
-        self.NG_REF_F = 128
+        self.NGF = 128
+        self.NDF = 64
+        self.NG_REF_F = 64
+        self.ND_DEC_F = 64
         self.GAN_LOSS = 'wgangp'   ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 1.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.USE_DROPOUT = True
-        self.N_BLOCKS = 1
+        self.N_BLOCKS = 9
         self.PADDING_TYPE = 'reflect'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
-        self.PROB_FLIP_LABELS = 0.00   ## Flip real-fake labels. 0.0 for no flip
+        self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
         self.BATCH_SIZE = 4
