@@ -36,9 +36,9 @@ class Config():
         # self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
         self.GROUP_N_LABELS_RANGES = [0, 10000]
         # self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
-        self.GROUP_WIDTH_RANGES = [-1, 1000, 100000]
+        self.GROUP_WIDTH_RANGES = [-1, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
-        self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        self.GROUP_HEIGHT_RANGES = [-1, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
@@ -46,7 +46,7 @@ class Config():
         self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
         self.RANDOM_CHANNEL_SWAPPING = False
-        self.RANDOM_GAMMA = True
+        self.RANDOM_GAMMA = False
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = False
 
@@ -59,7 +59,7 @@ class Config():
 
         ## GAN options
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
-        self.NGF = 256
+        self.NGF = 512
         self.NDF = 128
         self.NG_REF_F = 64
         self.ND_DEC_F = 64
@@ -69,15 +69,17 @@ class Config():
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.USE_DROPOUT = True
         self.N_BLOCKS = 9
-        self.PADDING_TYPE = 'reflect'
+        self.PADDING_TYPE = 'reflect'   ## One 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
         self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
-        self.BATCH_SIZE = 16
+        self.BATCH_SIZE = 4
         self.N_EPOCHS = 1000
-        self.LR = 2e-4
+        self.LR = 1e-4
+        self.LR_DROP_FACTOR = 0.75
+        self.LR_DROP_PATIENCE = 50
         self.BETA = 0.5
         self.WEIGHT_DECAY = 0.0
 

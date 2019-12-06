@@ -96,6 +96,8 @@ class GANModel(BaseModel):
         self.gan_loss1 = config.GAN_LOSS1
         self.gan_loss2 = config.GAN_LOSS2
         lr = config.LR
+        lr_drop_factor = config.LR_DROP_FACTOR
+        lr_drop_patience = config.LR_DROP_PATIENCE
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
         self.lambda_l1 = config.LAMBDA_L1
@@ -139,27 +141,27 @@ class GANModel(BaseModel):
 
             self.G_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_optimizer, 
                                                                              mode='min',
-                                                                             factor=0.75,
+                                                                             factor=lr_drop_factor,
                                                                              threshold=0.01,
-                                                                             patience=100)
+                                                                             patience=lr_drop_patience)
 
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
-                                                                             factor=0.75,
+                                                                             factor=lr_drop_factor,
                                                                              threshold=0.01,
-                                                                             patience=100)
+                                                                             patience=lr_drop_patience)
 
             self.G_refiner_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_refiner_optimizer, 
                                                                                      mode='min',
-                                                                                     factor=0.75,
+                                                                                     factor=lr_drop_factor,
                                                                                      threshold=0.01,
-                                                                                     patience=100)
+                                                                                     patience=lr_drop_patience)
 
             self.D_decider_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_decider_optimizer, 
                                                                                      mode='min',
-                                                                                     factor=0.75,
+                                                                                     factor=lr_drop_factor,
                                                                                      threshold=0.01,
-                                                                                     patience=100)
+                                                                                     patience=lr_drop_patience)
 
         ## Parallelize over gpus
         if torch.cuda.device_count() > 1:
@@ -373,7 +375,7 @@ class GANModel(BaseModel):
         ## Real-fake
         pred_rf = self.D(real_images, fake_wvs)
         loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
-        # if update and not classic:
+        # if update:
         #     loss_D_rf.backward()
 
         if self.gan_loss1 == 'wgangp':
