@@ -373,21 +373,24 @@ class GANModel(BaseModel):
             loss_D_fr.backward()
 
         ## Real-fake
-        pred_rf = self.D(real_images, fake_wvs)
-        loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
+        # pred_rf = self.D(real_images, fake_wvs)
+        # loss_D_rf, self.accuracy_D_rf = self.D_criterionGAN(pred_rf, target_is_real=False, prob_flip_labels=prob_flip_labels)
         # if update:
         #     loss_D_rf.backward()
 
         if self.gan_loss1 == 'wgangp':
             self.loss_gp_fr, _, _ = get_paired_gradient_penalty(self.D, rr_pair, fr_pair, self.device,
                                                    type='mixed', constant=1.0, lambda_gp=10.0)
-            self.loss_gp_rf, _, _ = get_paired_gradient_penalty(self.D, rr_pair, rf_pair, self.device,
-                                                   type='mixed', constant=1.0, lambda_gp=10.0)
+            # self.loss_gp_fr, _ = get_single_gradient_penalty(self.D, real_images, fake_images, self.device,
+            #                                        type='mixed', constant=1.0, lambda_gp=10.0)
+            # self.loss_gp_rf, _, _ = get_paired_gradient_penalty(self.D, rr_pair, rf_pair, self.device,
+            #                                        type='mixed', constant=1.0, lambda_gp=10.0)
             if update:
                 self.loss_gp_fr.backward(retain_graph=True)
-                self.loss_gp_rf.backward(retain_graph=True)
+                # self.loss_gp_rf.backward(retain_graph=True)
 
-        self.loss_D = loss_D_rr + (loss_D_rf + loss_D_fr) / 2
+        # self.loss_D = loss_D_rr + (loss_D_rf + loss_D_fr) / 2
+        self.loss_D = (loss_D_rr + loss_D_fr) * 0.5
 
     def backward_D_decider(self, rr_pair, fr_refined_pair, update=True, prob_flip_labels=0.0):
 
