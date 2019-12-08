@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=0.2, D_yticks=0.1):
+def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=5.0, D_yticks=5.0):
     assert mode in ['train', 'val'], "{} not available. Choose one of ['train', 'val']".format(mode)
 
     length = len(df.index)
@@ -48,7 +48,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=0.2, D_yticks
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot D decider loss
-    net_name = 'Discriminitor decider'
+    net_name = 'Discriminator decider'
     col_name = 'D_decider_loss'
     plt.subplot(3, 3, 4)
     plt.title("{} loss".format(net_name))
