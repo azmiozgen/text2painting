@@ -18,6 +18,7 @@ class Config():
 
         ## Shapes
         self.SENTENCE_LENGTH = 4
+        self.NOISE_LENGTH = 1
         self.WV_SIZE = 64        ## Should be same as in data/config.py
         self.IMAGE_WIDTH = 64
         self.IMAGE_HEIGHT = 64
@@ -60,8 +61,8 @@ class Config():
         self.WORD_VECTORS_DISSIMILAR_TOPN = 10
 
         ## GAN options
-        self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
-        self.NGF = 384
+        self.N_INPUT = (self.SENTENCE_LENGTH + self.NOISE_LENGTH) * self.WV_SIZE
+        self.NGF = 128
         self.NDF = 128
         self.NG_REF_F = 64
         self.ND_DEC_F = 64
@@ -71,7 +72,7 @@ class Config():
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.USE_SPECTRAL_NORM = True
         self.USE_DROPOUT = True
-        self.N_BLOCKS = 9
+        self.N_BLOCKS = 6
         self.PADDING_TYPE = 'reflect'   ## One of 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
@@ -79,15 +80,17 @@ class Config():
 
         ## Hyper-params
         self.BATCH_SIZE = 4
-        self.N_EPOCHS = 10000
+        self.N_EPOCHS = 1000
         self.G_LR = 1e-4
         self.D_LR = 4e-4
         self.G_REFINER_LR = 1e-4
         self.D_DECIDER_LR = 4e-4
         self.LR_DROP_FACTOR = 0.75
-        self.LR_DROP_PATIENCE = 50
+        self.LR_DROP_PATIENCE = self.N_EPOCHS // 3
         self.BETA = 0.5
         self.WEIGHT_DECAY = 0.0
+        self.WEIGHT_INIT = 'kaiming'  ## One of 'normal', 'xavier', 'kaiming', 'orthogonal'
+        self.INIT_GAIN = 0.02
 
         ## Hardware
         self.DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -103,7 +106,7 @@ class Config():
         self.N_PRINT_BATCH = 2
         self.N_LOG_BATCH = 3
         self.N_SAVE_VISUALS_BATCH = 3
-        self.N_SAVE_MODEL_EPOCHS = 50
+        self.N_SAVE_MODEL_EPOCHS = 1000
         self.N_GRID_ROW = 8
 
         ## Misc

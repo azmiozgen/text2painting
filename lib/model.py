@@ -103,19 +103,19 @@ class GANModel(BaseModel):
         lr_drop_patience = config.LR_DROP_PATIENCE
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
+        weight_init = config.WEIGHT_INIT
+        init_gain = config.INIT_GAIN
         self.lambda_l1 = config.LAMBDA_L1
         self.inv_normalize = config.NORMALIZE
         self.prob_flip_labels = config.PROB_FLIP_LABELS
 
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
-        # self.G = GeneratorSimple(config).to(self.device)
         self.G_refiner = GeneratorRefiner(config).to(self.device)
 
         ## Init D, optimizers, schedulers
         if mode == 'train':
             self.D = DiscriminatorStack(config).to(self.device)
-            # self.D = DiscriminatorSimple(config).to(self.device)
             self.D_decider = DiscriminatorDecider(config).to(self.device)
 
             self.G_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=False).to(self.device)
@@ -172,6 +172,12 @@ class GANModel(BaseModel):
             self.D = torch.nn.DataParallel(self.D)
             self.G_refiner = torch.nn.DataParallel(self.G_refiner)
             self.D_decider = torch.nn.DataParallel(self.D_decider)
+
+        ## Init weights
+        self.init_weights(self.G, weight_init, init_gain=init_gain)
+        self.init_weights(self.D, weight_init, init_gain=init_gain)
+        self.init_weights(self.G_refiner, weight_init, init_gain=init_gain)
+        self.init_weights(self.D_decider, weight_init, init_gain=init_gain)
 
         ## Init things (these will get values later) 
         self.state_dict = {
@@ -235,7 +241,30 @@ class GANModel(BaseModel):
         print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
+        print("\tWeight initialization:", weight_init)
         print("\tGenerator lambda weight:", self.lambda_l1)
+
+    def init_weights(self, net, init_type, init_gain=0.02):
+        def init_func(m):
+            classname = m.__class__.__name__
+            if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
+                if init_type == 'normal':
+                    torch.nn.init.normal_(m.weight.data, 0.0, init_gain)
+                elif init_type == 'xavier':
+                    torch.nn.init.xavier_normal_(m.weight.data, gain=init_gain)
+                elif init_type == 'kaiming':
+                    torch.nn.init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+                elif init_type == 'orthogonal':
+                    torch.nn.init.orthogonal_(m.weight.data, gain=init_gain)
+                else:
+                    raise NotImplementedError('initialization method [%s] is not implemented' % init_type)
+                if hasattr(m, 'bias') and m.bias is not None:
+                    torch.nn.init.constant_(m.bias.data, 0.0)
+            elif classname.find('BatchNorm2d') != -1:
+                torch.nn.init.normal_(m.weight.data, 1.0, init_gain)
+                torch.nn.init.constant_(m.bias.data, 0.0)
+
+        net.apply(init_func)
 
     def load_state_dict(self, model_file):
         ## Get epoch

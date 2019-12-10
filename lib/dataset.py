@@ -139,6 +139,7 @@ class AlignCollate(object):
         self.random_resolution = config.RANDOM_RESOLUTION
 
         self.sentence_length = config.SENTENCE_LENGTH
+        self.noise_length = config.NOISE_LENGTH
 
         self._mode = mode
         assert self._mode in ['train', 'val']
@@ -228,7 +229,6 @@ class AlignCollate(object):
         shifted = wv_tensor - wv_tensor.min()
         norm = shifted / ((shifted).max() + 1e-10)
         return norm * 2 - 1
-        # return norm
 
     def _get_word_vector(self, word):
         if self.word2vec_model.wv.vocab.get(word):
@@ -266,11 +266,11 @@ class AlignCollate(object):
         return self._get_word_vector(similar_word)
 
 
-    def _pad_wvs_with_similar_wvs(self, word_vectors):
+    def _pad_wvs_with_similar_wvs(self, word_vectors, final_length):
         '''
         Pad word vectors array with random similar word vectors
         '''
-        while len(word_vectors) < self.sentence_length:
+        while len(word_vectors) < final_length:
             word_vector = random.choice(word_vectors)
             similar_vector = torch.Tensor(self._get_similar_wv_by_vector(word_vector)).unsqueeze(0)
             word_vectors = torch.cat((word_vectors, similar_vector))
@@ -278,21 +278,21 @@ class AlignCollate(object):
         return word_vectors
 
 
-    def _pad_wvs_with_noise(self, word_vectors):
+    def _pad_wvs_with_noise(self, word_vectors, final_length):
         '''
         Pad word vectors array with random noise
         '''
-        pad_length = self.sentence_length - len(word_vectors)
+        pad_length = final_length - len(word_vectors)
         padding_tensor = torch.rand(pad_length, word_vectors.size()[1]) * 2 - 1   ## [-1, 1]
         word_vectors = torch.cat((word_vectors, padding_tensor))
 
         return word_vectors
 
-    def _crop_wvs(self, word_vectors):
+    def _crop_wvs(self, word_vectors, final_length):
         '''
         Crop word vectors randomly array to be equal to sentence length
         '''
-        return word_vectors[torch.randperm(self.sentence_length)]
+        return word_vectors[torch.randperm(final_length)]
 
     def _get_dissimilar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
@@ -331,11 +331,16 @@ class AlignCollate(object):
             ## Pad or crop true wvs
             if len(word_vectors) < self.sentence_length:
                 if self.word_vectors_similar_pad:
-                    word_vectors = self._pad_wvs_with_similar_wvs(word_vectors)
+                    word_vectors = self._pad_wvs_with_similar_wvs(word_vectors, self.sentence_length)
                 else:
-                    word_vectors = self._pad_wvs_with_noise(word_vectors)
+                    word_vectors = self._pad_wvs_with_noise(word_vectors, self.sentence_length)
             else:
-                word_vectors = self._crop_wvs(word_vectors)
+                word_vectors = self._crop_wvs(word_vectors, self.sentence_length)
+
+            ## Add noise
+            if self.noise_length > 0:
+                word_vectors = self._pad_wvs_with_noise(word_vectors, self.sentence_length + self.noise_length)
+
             word_vectors_list.append(word_vectors)
 
             ## Get fake wvs
