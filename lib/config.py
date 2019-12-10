@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'verified'
+        SUBSET = 'extreme'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -28,8 +28,10 @@ class Config():
 
         ## Stats (Change w.r.t stats file under data/)
         self.NORMALIZE = True
-        self.MEAN = [0.1036, 0.3302, 0.3311]
-        self.STD = [0.1233, 0.2243, 0.3484]
+        # self.MEAN = [0.1036, 0.3302, 0.3311]
+        # self.STD = [0.1233, 0.2243, 0.3484]
+        self.MEAN = [0.5505, 0.3927, 0.4473]
+        self.STD = [0.2245, 0.2782, 0.3102]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -59,25 +61,29 @@ class Config():
 
         ## GAN options
         self.N_INPUT = self.SENTENCE_LENGTH * self.WV_SIZE
-        self.NGF = 512
+        self.NGF = 384
         self.NDF = 128
         self.NG_REF_F = 64
         self.ND_DEC_F = 64
         self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.GAN_LOSS2 = 'wgangp'     ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 1.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
+        self.USE_SPECTRAL_NORM = True
         self.USE_DROPOUT = True
         self.N_BLOCKS = 9
-        self.PADDING_TYPE = 'reflect'   ## One 'reflect', 'replicate', 'zero'
+        self.PADDING_TYPE = 'reflect'   ## One of 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
         self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
         self.BATCH_SIZE = 4
-        self.N_EPOCHS = 1000
-        self.LR = 1e-4
+        self.N_EPOCHS = 10000
+        self.G_LR = 1e-4
+        self.D_LR = 4e-4
+        self.G_REFINER_LR = 1e-4
+        self.D_DECIDER_LR = 4e-4
         self.LR_DROP_FACTOR = 0.75
         self.LR_DROP_PATIENCE = 50
         self.BETA = 0.5
@@ -89,10 +95,15 @@ class Config():
         self.N_GPUS = 1
 
         ## Logging
-        self.N_PRINT_BATCH = 50
-        self.N_LOG_BATCH = 100
-        self.N_SAVE_VISUALS_BATCH = 100
-        self.N_SAVE_MODEL_EPOCHS = 20
+        # self.N_PRINT_BATCH = 50
+        # self.N_LOG_BATCH = 100
+        # self.N_SAVE_VISUALS_BATCH = 100
+        # self.N_SAVE_MODEL_EPOCHS = 20
+        # self.N_GRID_ROW = 8
+        self.N_PRINT_BATCH = 2
+        self.N_LOG_BATCH = 3
+        self.N_SAVE_VISUALS_BATCH = 3
+        self.N_SAVE_MODEL_EPOCHS = 50
         self.N_GRID_ROW = 8
 
         ## Misc

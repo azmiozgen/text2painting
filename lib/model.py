@@ -95,7 +95,10 @@ class GANModel(BaseModel):
         self.batch_size = config.BATCH_SIZE
         self.gan_loss1 = config.GAN_LOSS1
         self.gan_loss2 = config.GAN_LOSS2
-        lr = config.LR
+        g_lr = config.G_LR
+        d_lr = config.D_LR
+        g_refiner_lr = config.G_REFINER_LR
+        d_decider_lr = config.D_DECIDER_LR
         lr_drop_factor = config.LR_DROP_FACTOR
         lr_drop_patience = config.LR_DROP_PATIENCE
         beta = config.BETA
@@ -123,19 +126,19 @@ class GANModel(BaseModel):
             self.G_refiner_criterion_dist = torch.nn.MSELoss()
 
             self.G_optimizer = torch.optim.Adam(self.G.parameters(),
-                                                lr=lr,
+                                                lr=g_lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
             self.D_optimizer = torch.optim.Adam(self.D.parameters(),
-                                                lr=lr,
+                                                lr=d_lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
             self.G_refiner_optimizer = torch.optim.Adam(self.G_refiner.parameters(),
-                                                lr=lr,
+                                                lr=g_refiner_lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
             self.D_decider_optimizer = torch.optim.Adam(self.D_decider.parameters(),
-                                                lr=lr,
+                                                lr=d_decider_lr,
                                                 betas=(beta, 0.999),
                                                 weight_decay=weight_decay)
 
@@ -229,7 +232,7 @@ class GANModel(BaseModel):
         print("\tGAN loss1:", self.gan_loss1)
         print("\tGAN loss2:", self.gan_loss2)
         # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
-        print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
+        print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tGenerator lambda weight:", self.lambda_l1)
@@ -475,8 +478,8 @@ class GANModel(BaseModel):
         self.D_lr_scheduler.step(0)
         self.G_refiner_lr_scheduler.step(0)
         self.D_decider_lr_scheduler.step(0)
-        D_lr = self.G_optimizer.param_groups[0]['lr']
-        G_lr = self.D_optimizer.param_groups[0]['lr']
+        G_lr = self.G_optimizer.param_groups[0]['lr']
+        D_lr = self.D_optimizer.param_groups[0]['lr']
         G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
         D_decider_lr = self.D_decider_optimizer.param_groups[0]['lr']
 
