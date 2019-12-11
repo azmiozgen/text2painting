@@ -517,14 +517,10 @@ class GANModel(BaseModel):
         print('\t\t(G_refiner learning rate is {:.4E})'.format(G_refiner_lr))
         print('\t\t(D_decider learning rate is {:.4E})'.format(D_decider_lr))
 
-    def generate_grid(self, real_wvs, real_images, word2vec_model):
-        ## Generate fake image
-        real_wvs_flat = real_wvs.view(self.batch_size, -1)
-        fake_images = self.forward(self.G, real_wvs_flat)
-        refined = self.forward(self.G_refiner, fake_images)
+    def generate_grid(self, real_wvs, fake_images, refined1, refined2, real_images, word2vec_model):
 
         images_bag = []
-        for fake_image, real_image, real_wv, _refined in zip(fake_images, real_images, real_wvs, refined):
+        for real_wv, fake_image, _refined1, _refined2, real_image, in zip(real_wvs, fake_images, refined1, refined2, real_images):
             words = []
 
             ## Get words from word vectors
@@ -541,14 +537,16 @@ class GANModel(BaseModel):
             if self.inv_normalize:
                 fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
                 real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
-                _refined = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined)
+                _refined1 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined1)
+                _refined2 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined2)
 
             ## Go to cpu numpy array
             fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
             real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
-            _refined = _refined.detach().cpu().numpy().transpose(1, 2, 0)
+            _refined1 = _refined1.detach().cpu().numpy().transpose(1, 2, 0)
+            _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
 
-            images_bag.extend([word_image, fake_image, _refined, real_image])
+            images_bag.extend([word_image, fake_image, _refined1, refined2, real_image])
 
         images_bag = np.array(images_bag)
         grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=self.config.N_GRID_ROW).permute(1, 2, 0)
@@ -598,10 +596,11 @@ class GANModel(BaseModel):
         fake_images = self.forward(self.G, real_wv_flat)
 
         ## Forward G_refiner
-        refined = self.forward(self.G_refiner, fake_images)
+        refined1 = self.forward(self.G_refiner, fake_images)
+        refined2 = self.forward(self.G_refiner, refined1)
 
         ## Make input pairs
-        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined)
+        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined2)
 
         if phase == 'train':
 
@@ -643,3 +642,5 @@ class GANModel(BaseModel):
             self.backward_G(fr_pair, real_images, update=False, prob_flip_labels=0.0)
             self.backward_D_decider(rr_pair, fr_refined_pair, update=False, prob_flip_labels=0.0)
             self.backward_G_refiner(fr_refined_pair, real_images, update=False, prob_flip_labels=0.0)
+
+        return fake_images, refined1, refined2

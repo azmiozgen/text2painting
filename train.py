@@ -122,7 +122,7 @@ if __name__ == "__main__":
                 batch_size = real_images.size()[0]
 
                 ## Fit batch
-                model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
+                fake_images, refined1, refined2 = model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
 
                 ## Update total loss
                 loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_gp_fr, loss_gp_rf, loss_gp_decider_fr = model.get_losses()
@@ -167,7 +167,7 @@ if __name__ == "__main__":
                 try:
                     if iteration % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
                         output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
-                        grid_img_pil = model.generate_grid(real_wvs, real_images, train_dataset.word2vec_model)
+                        grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, train_dataset.word2vec_model)
                         model.save_img_output(grid_img_pil, output_filename)
                         # model.save_grad_output(output_filename)
                 except Exception as e:

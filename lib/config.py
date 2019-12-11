@@ -107,7 +107,7 @@ class Config():
         self.N_LOG_BATCH = 3
         self.N_SAVE_VISUALS_BATCH = 3
         self.N_SAVE_MODEL_EPOCHS = 1000
-        self.N_GRID_ROW = 8
+        self.N_GRID_ROW = 10
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
