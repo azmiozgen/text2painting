@@ -520,7 +520,7 @@ class GANModel(BaseModel):
     def generate_grid(self, real_wvs, fake_images, refined1, refined2, real_images, word2vec_model):
 
         images_bag = []
-        for real_wv, fake_image, _refined1, _refined2, real_image, in zip(real_wvs, fake_images, refined1, refined2, real_images):
+        for real_wv, fake_image, _refined1, _refined2, real_image in zip(real_wvs, fake_images, refined1, refined2, real_images):
             words = []
 
             ## Get words from word vectors
@@ -546,7 +546,7 @@ class GANModel(BaseModel):
             _refined1 = _refined1.detach().cpu().numpy().transpose(1, 2, 0)
             _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
 
-            images_bag.extend([word_image, fake_image, _refined1, refined2, real_image])
+            images_bag.extend([word_image, fake_image, _refined1, _refined2, real_image])
 
         images_bag = np.array(images_bag)
         grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=self.config.N_GRID_ROW).permute(1, 2, 0)

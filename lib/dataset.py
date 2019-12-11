@@ -356,6 +356,106 @@ class AlignCollate(object):
 
 class ImageBatchSampler(Sampler):
     '''
+        Group image files by their groups.
+    '''
+
+    def __init__(self, config, mode='train'):
+
+        assert mode in ['train', 'val', 'test']
+
+        self.config = config
+        self.batch_size = config.BATCH_SIZE
+        self.shuffle_groups = config.SHUFFLE_GROUPS
+        width_ranges = config.GROUP_WIDTH_RANGES
+        height_ranges = config.GROUP_HEIGHT_RANGES
+
+        data_dir = config.DATA_DIR
+        labels_filename = '{}_labels.csv'.format(mode)
+        labels_file = os.path.join(data_dir, labels_filename)
+        shapes_filename = '{}_image_shapes.csv'.format(mode)
+        shapes_file = os.path.join(data_dir, shapes_filename)
+
+        ## Read labels file
+        with open(labels_file, 'r') as f:
+            lines = f.readlines()
+        label_lines = list(map(lambda s:s.strip(), lines))
+
+        ## Read shapes file
+        shape_lines = np.loadtxt(shapes_file, delimiter=',', dtype=str)
+
+        ## Create image_file, group df
+        image_n_labels = []
+        for label_line in label_lines:
+            image_relative_file = label_line.split(',')[0]
+            group = image_relative_file.split('/')[1].split('_')[-1]
+            image_n_groups.append([image_relative_file, group])
+        image_n_groups = np.array(image_n_groups)
+        df_image_n_groups = pd.DataFrame(image_n_groups, columns=['image_file', 'groups'])
+
+        ## Create image_file, shapes df
+        df_image_shapes = pd.DataFrame(shape_lines, columns=['image_file', 'width', 'height'])
+
+        ## Merge two df on image files
+        self.df = pd.merge(df_image_shapes, df_image_n_groups, on='image_file')
+        self.df = self.df.astype({'image_file': str, 'width': int, 'height': int, 'groups': int})
+        self.df['index'] = self.df.index
+
+        ## Group batches
+        self.groups = []
+        df_n_groups_grouped = self.df.groupby(by=self.df['groups'])
+
+        ## Group by groups
+        for key1, _ in df_n_labels_grouped:
+            df1 = df_n_labels_grouped.get_group(key1)
+            df_width_grouped = df1.groupby(by=pd.cut(df1['width'], width_ranges))
+
+            ## Group by widths
+            for key2, _ in df_width_grouped:
+                df2 = df_width_grouped.get_group(key2)
+                df_height_grouped = df2.groupby(by=pd.cut(df2['height'], height_ranges))
+
+                ## Group by heights
+                for key3, _ in df_height_grouped:
+                    group_df = df_height_grouped.get_group(key3)
+                    self.groups.append(group_df)
+
+    def _group_batches(self):
+        sample_indexes = []
+        n_batches = len(self.df.index) // self.batch_size
+        group_index = 0
+        while n_batches > 0:
+            ## If lasts are dropped groups may end
+            if group_index == len(self.groups):
+                break
+            group = np.array(self.groups[group_index])
+            if self.shuffle_groups:
+                np.random.shuffle(group)
+            batch = []
+            for sample in group:
+                sample_index = sample[-1]    ## Index is last column in df
+                batch.append(sample_index)
+                if len(batch) == self.batch_size:
+                    sample_indexes.extend(batch)
+                    n_batches -= 1
+                    batch = []
+                    continue
+            group_index += 1
+            ## Uncomment not to drop lasts
+            # if batch != []:
+            #     sample_indexes.extend(batch)
+            #     n_batches -= 1
+            #     group_index += 1
+        return sample_indexes
+
+    def __iter__(self):
+        self.grouped_indexes = self._group_batches()
+        return iter(self.grouped_indexes)
+
+    def __len__(self):
+        return len(self.df.index)
+
+class ImageBatchSamplerAlt(Sampler):
+    '''
         Group image files by their image sizes # of labels and sample similar from images.
     '''
 

@@ -37,7 +37,7 @@ class Config():
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
         # self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
-        self.GROUP_N_LABELS_RANGES = [0, 10000]
+        # self.GROUP_N_LABELS_RANGES = [0, 10000]
         # self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
         self.GROUP_WIDTH_RANGES = [-1, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
