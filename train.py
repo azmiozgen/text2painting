@@ -38,16 +38,16 @@ if __name__ == "__main__":
     val_dataset = TextArtDataLoader(CONFIG, mode='val')
     train_align_collate = AlignCollate(CONFIG, 'train')
     val_align_collate = AlignCollate(CONFIG, 'val')
-    # train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
-    # val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
+    train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
+    val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
     train_loader = DataLoader(train_dataset,
                               batch_size=CONFIG.BATCH_SIZE,
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=CONFIG.N_WORKERS,
                               pin_memory=True,
                               collate_fn=train_align_collate,
-                            #   sampler=train_batch_sampler,
-                              drop_last=True,
+                              sampler=train_batch_sampler,
+                            #   drop_last=True,
                               )
     val_loader = DataLoader(val_dataset,
                             batch_size=CONFIG.BATCH_SIZE,
@@ -55,8 +55,8 @@ if __name__ == "__main__":
                             num_workers=CONFIG.N_WORKERS,
                             pin_memory=True,
                             collate_fn=val_align_collate,
-                            # sampler=val_batch_sampler,
-                            drop_last=True,
+                            sampler=val_batch_sampler,
+                            # drop_last=True,
                             )
     print("\tTrain size:", len(train_dataset))
     print("\tValidation size:", len(val_dataset))
@@ -122,7 +122,8 @@ if __name__ == "__main__":
                 batch_size = real_images.size()[0]
 
                 ## Fit batch
-                fake_images, refined1, refined2 = model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
+                # fake_images, refined1, refined2 = model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
+                fake_images, refined1 = model.fit(data, phase=phase, train_D=train_D, train_G=train_G)
 
                 ## Update total loss
                 loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_gp_fr, loss_gp_rf, loss_gp_decider_fr = model.get_losses()
@@ -167,7 +168,8 @@ if __name__ == "__main__":
                 try:
                     if iteration % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
                         output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
-                        grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, train_dataset.word2vec_model)
+                        # grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, train_dataset.word2vec_model)
+                        grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, real_images, train_dataset.word2vec_model)
                         model.save_img_output(grid_img_pil, output_filename)
                         # model.save_grad_output(output_filename)
                 except Exception as e:
@@ -199,7 +201,7 @@ if __name__ == "__main__":
             print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
 
         ## Update lr
-        model.update_lr()
+        model.update_lr(total_loss_g, total_loss_d, total_loss_g_refiner, total_loss_d_decider)
 
         ## Save model
         if epoch % CONFIG.N_SAVE_MODEL_EPOCHS == 0:

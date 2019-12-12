@@ -384,7 +384,7 @@ class ImageBatchSampler(Sampler):
         shape_lines = np.loadtxt(shapes_file, delimiter=',', dtype=str)
 
         ## Create image_file, group df
-        image_n_labels = []
+        image_n_groups = []
         for label_line in label_lines:
             image_relative_file = label_line.split(',')[0]
             group = image_relative_file.split('/')[1].split('_')[-1]
@@ -402,11 +402,11 @@ class ImageBatchSampler(Sampler):
 
         ## Group batches
         self.groups = []
-        df_n_groups_grouped = self.df.groupby(by=self.df['groups'])
+        df_groups_grouped = self.df.groupby(by=self.df['groups'])
 
         ## Group by groups
-        for key1, _ in df_n_labels_grouped:
-            df1 = df_n_labels_grouped.get_group(key1)
+        for key1, _ in df_groups_grouped:
+            df1 = df_groups_grouped.get_group(key1)
             df_width_grouped = df1.groupby(by=pd.cut(df1['width'], width_ranges))
 
             ## Group by widths
@@ -432,9 +432,10 @@ class ImageBatchSampler(Sampler):
                 np.random.shuffle(group)
             batch = []
             for sample in group:
+                # print(sample)
                 sample_index = sample[-1]    ## Index is last column in df
                 batch.append(sample_index)
-                if len(batch) == self.batch_size:
+                if len(batch) == self.batch_size:  ## Extend only if length equals batch size (drop lasts)
                     sample_indexes.extend(batch)
                     n_batches -= 1
                     batch = []

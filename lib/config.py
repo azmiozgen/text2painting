@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'extreme'
+        SUBSET = 'united'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -31,8 +31,10 @@ class Config():
         self.NORMALIZE = True
         # self.MEAN = [0.1036, 0.3302, 0.3311]
         # self.STD = [0.1233, 0.2243, 0.3484]
-        self.MEAN = [0.5505, 0.3927, 0.4473]
-        self.STD = [0.2245, 0.2782, 0.3102]
+        # self.MEAN = [0.5505, 0.3927, 0.4473]
+        # self.STD = [0.2245, 0.2782, 0.3102]
+        self.MEAN = [0.7573, 0.3212, 0.7568]
+        self.STD = [0.2828, 0.1164, 0.2384]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -48,10 +50,10 @@ class Config():
         self.HORIZONTAL_FLIPPING = True
         self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
-        self.RANDOM_CHANNEL_SWAPPING = False
-        self.RANDOM_GAMMA = False
+        self.RANDOM_CHANNEL_SWAPPING = True
+        self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = False
+        self.RANDOM_RESOLUTION = True
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
@@ -63,9 +65,9 @@ class Config():
         ## GAN options
         self.N_INPUT = (self.SENTENCE_LENGTH + self.NOISE_LENGTH) * self.WV_SIZE
         self.NGF = 128
-        self.NDF = 128
+        self.NDF = 96
         self.NG_REF_F = 64
-        self.ND_DEC_F = 64
+        self.ND_DEC_F = 48
         self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 1.0
@@ -80,13 +82,14 @@ class Config():
 
         ## Hyper-params
         self.BATCH_SIZE = 4
-        self.N_EPOCHS = 1000
-        self.G_LR = 1e-4
-        self.D_LR = 4e-4
-        self.G_REFINER_LR = 1e-4
-        self.D_DECIDER_LR = 4e-4
-        self.LR_DROP_FACTOR = 0.75
-        self.LR_DROP_PATIENCE = self.N_EPOCHS // 3
+        self.N_EPOCHS = 2000
+        self.G_LR = 1e-5
+        self.D_LR = 1e-5
+        self.G_REFINER_LR = 1e-5
+        self.D_DECIDER_LR = 1e-5
+        self.LR_DROP_FACTOR = 0.5
+        self.LR_DROP_PATIENCE = self.N_EPOCHS // 10
+        self.LR_MIN_VAL = 1e-6
         self.BETA = 0.5
         self.WEIGHT_DECAY = 0.0
         self.WEIGHT_INIT = 'kaiming'  ## One of 'normal', 'xavier', 'kaiming', 'orthogonal'
@@ -103,11 +106,11 @@ class Config():
         # self.N_SAVE_VISUALS_BATCH = 100
         # self.N_SAVE_MODEL_EPOCHS = 20
         # self.N_GRID_ROW = 8
-        self.N_PRINT_BATCH = 2
-        self.N_LOG_BATCH = 3
-        self.N_SAVE_VISUALS_BATCH = 3
-        self.N_SAVE_MODEL_EPOCHS = 1000
-        self.N_GRID_ROW = 10
+        self.N_PRINT_BATCH = 20
+        self.N_LOG_BATCH = 30
+        self.N_SAVE_VISUALS_BATCH = 30
+        self.N_SAVE_MODEL_EPOCHS = 100
+        self.N_GRID_ROW = 8
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']

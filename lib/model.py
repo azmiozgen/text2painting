@@ -101,6 +101,7 @@ class GANModel(BaseModel):
         d_decider_lr = config.D_DECIDER_LR
         lr_drop_factor = config.LR_DROP_FACTOR
         lr_drop_patience = config.LR_DROP_PATIENCE
+        lr_min_val = config.LR_MIN_VAL
         beta = config.BETA
         weight_decay = config.WEIGHT_DECAY
         weight_init = config.WEIGHT_INIT
@@ -146,25 +147,29 @@ class GANModel(BaseModel):
                                                                              mode='min',
                                                                              factor=lr_drop_factor,
                                                                              threshold=0.01,
-                                                                             patience=lr_drop_patience)
+                                                                             patience=lr_drop_patience,
+                                                                             min_lr=lr_min_val)
 
             self.D_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_optimizer, 
                                                                              mode='min',
                                                                              factor=lr_drop_factor,
                                                                              threshold=0.01,
-                                                                             patience=lr_drop_patience)
+                                                                             patience=lr_drop_patience,
+                                                                             min_lr=lr_min_val)
 
             self.G_refiner_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.G_refiner_optimizer, 
                                                                                      mode='min',
                                                                                      factor=lr_drop_factor,
                                                                                      threshold=0.01,
-                                                                                     patience=lr_drop_patience)
+                                                                                     patience=lr_drop_patience,
+                                                                                     min_lr=lr_min_val)
 
             self.D_decider_lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.D_decider_optimizer, 
                                                                                      mode='min',
                                                                                      factor=lr_drop_factor,
                                                                                      threshold=0.01,
-                                                                                     patience=lr_drop_patience)
+                                                                                     patience=lr_drop_patience,
+                                                                                     min_lr=lr_min_val)
 
         ## Parallelize over gpus
         if torch.cuda.device_count() > 1:
@@ -285,10 +290,10 @@ class GANModel(BaseModel):
             self.G_refiner_lr_scheduler.load_state_dict(state['g_refiner_lr_scheduler'])
             self.D_decider_lr_scheduler.load_state_dict(state['d_decider_lr_scheduler'])
         if self.reset_lr:
-            self.G_optimizer.param_groups[0]['lr'] = self.config.LR
-            self.D_optimizer.param_groups[0]['lr'] = self.config.LR
-            self.G_refiner_optimizer.param_groups[0]['lr'] = self.config.LR
-            self.D_decider_optimizer.param_groups[0]['lr'] = self.config.LR
+            self.G_optimizer.param_groups[0]['lr'] = self.config.G_LR
+            self.D_optimizer.param_groups[0]['lr'] = self.config.D_LR
+            self.G_refiner_optimizer.param_groups[0]['lr'] = self.config.G_REFINER_LR
+            self.D_decider_optimizer.param_groups[0]['lr'] = self.config.D_DECIDER_LR
         self.set_state_dict()
 
     def set_state_dict(self):
@@ -502,11 +507,11 @@ class GANModel(BaseModel):
         # return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr)
         return (self.accuracy_D_rr, self.accuracy_D_rf, self.accuracy_D_fr, self.accuracy_D_decider_rr, self.accuracy_D_decider_fr)
 
-    def update_lr(self):
-        self.G_lr_scheduler.step(0)
-        self.D_lr_scheduler.step(0)
-        self.G_refiner_lr_scheduler.step(0)
-        self.D_decider_lr_scheduler.step(0)
+    def update_lr(self, loss_g, loss_d, loss_g_refiner, loss_d_decider):
+        self.G_lr_scheduler.step(loss_g)
+        self.D_lr_scheduler.step(loss_d)
+        self.G_refiner_lr_scheduler.step(loss_g_refiner)
+        self.D_decider_lr_scheduler.step(loss_d_decider)
         G_lr = self.G_optimizer.param_groups[0]['lr']
         D_lr = self.D_optimizer.param_groups[0]['lr']
         G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
@@ -517,10 +522,12 @@ class GANModel(BaseModel):
         print('\t\t(G_refiner learning rate is {:.4E})'.format(G_refiner_lr))
         print('\t\t(D_decider learning rate is {:.4E})'.format(D_decider_lr))
 
-    def generate_grid(self, real_wvs, fake_images, refined1, refined2, real_images, word2vec_model):
+    # def generate_grid(self, real_wvs, fake_images, refined1, refined2, real_images, word2vec_model):
+    def generate_grid(self, real_wvs, fake_images, refined1, real_images, word2vec_model):
 
         images_bag = []
-        for real_wv, fake_image, _refined1, _refined2, real_image in zip(real_wvs, fake_images, refined1, refined2, real_images):
+        # for real_wv, fake_image, _refined1, _refined2, real_image in zip(real_wvs, fake_images, refined1, refined2, real_images):
+        for real_wv, fake_image, _refined1, real_image in zip(real_wvs, fake_images, refined1, real_images):
             words = []
 
             ## Get words from word vectors
@@ -538,15 +545,16 @@ class GANModel(BaseModel):
                 fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
                 real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
                 _refined1 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined1)
-                _refined2 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined2)
+                # _refined2 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined2)
 
             ## Go to cpu numpy array
             fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
             real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
             _refined1 = _refined1.detach().cpu().numpy().transpose(1, 2, 0)
-            _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
+            # _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
 
-            images_bag.extend([word_image, fake_image, _refined1, _refined2, real_image])
+            # images_bag.extend([word_image, fake_image, _refined1, _refined2, real_image])
+            images_bag.extend([word_image, fake_image, _refined1, real_image])
 
         images_bag = np.array(images_bag)
         grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=self.config.N_GRID_ROW).permute(1, 2, 0)
@@ -597,10 +605,10 @@ class GANModel(BaseModel):
 
         ## Forward G_refiner
         refined1 = self.forward(self.G_refiner, fake_images)
-        refined2 = self.forward(self.G_refiner, refined1)
+        # refined2 = self.forward(self.G_refiner, refined1)
 
         ## Make input pairs
-        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined2)
+        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined1)
 
         if phase == 'train':
 
@@ -643,4 +651,5 @@ class GANModel(BaseModel):
             self.backward_D_decider(rr_pair, fr_refined_pair, update=False, prob_flip_labels=0.0)
             self.backward_G_refiner(fr_refined_pair, real_images, update=False, prob_flip_labels=0.0)
 
-        return fake_images, refined1, refined2
+        # return fake_images, refined1, refined2
+        return fake_images, refined1
