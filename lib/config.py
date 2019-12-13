@@ -33,8 +33,8 @@ class Config():
         # self.STD = [0.1233, 0.2243, 0.3484]
         # self.MEAN = [0.5505, 0.3927, 0.4473]
         # self.STD = [0.2245, 0.2782, 0.3102]
-        self.MEAN = [0.7573, 0.3212, 0.7568]
-        self.STD = [0.2828, 0.1164, 0.2384]
+        self.MEAN = [0.9036, 0.7096, 0.8660]
+        self.STD = [0.2221, 0.1697, 0.2122]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -49,7 +49,7 @@ class Config():
         ## Augmentation options
         self.HORIZONTAL_FLIPPING = True
         self.RANDOM_ROTATION = False
-        self.COLOR_JITTERING = False
+        self.COLOR_JITTERING = True
         self.RANDOM_CHANNEL_SWAPPING = True
         self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
