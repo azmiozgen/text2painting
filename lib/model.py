@@ -8,7 +8,7 @@ from PIL import Image
 import torch
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefiner, DiscriminatorDecider
+from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefiner, DiscriminatorDecider, GeneratorRefinerUNet
 from .utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
                     get_uuid, words2image, ImageUtilities, register_hooks)
 
@@ -112,7 +112,8 @@ class GANModel(BaseModel):
 
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
-        self.G_refiner = GeneratorRefiner(config).to(self.device)
+        # self.G_refiner = GeneratorRefiner(config).to(self.device)
+        self.G_refiner = GeneratorRefinerUNet(config).to(self.device)
 
         ## Init D, optimizers, schedulers
         if mode == 'train':
@@ -426,8 +427,9 @@ class GANModel(BaseModel):
                 self.loss_gp_fr.backward(retain_graph=True)
                 # self.loss_gp_rf.backward(retain_graph=True)
 
-        # self.loss_D = loss_D_rr + (loss_D_rf + loss_D_fr) / 2
-        self.loss_D = (loss_D_rr + loss_D_fr) * 0.5
+            self.loss_D = loss_D_rr + loss_D_fr + self.loss_gp_fr
+        else:
+            self.loss_D = loss_D_rr + loss_D_fr
 
     def backward_D_decider(self, rr_pair, fr_refined_pair, update=True, prob_flip_labels=0.0):
 
@@ -453,7 +455,9 @@ class GANModel(BaseModel):
             if update:
                 self.loss_gp_decider_fr.backward(retain_graph=True)
 
-        self.loss_D_decider = loss_D_decider_rr + loss_D_decider_fr
+            self.loss_D_decider = loss_D_decider_rr + loss_D_decider_fr + self.loss_gp_decider_fr
+        else:
+            self.loss_D_decider = loss_D_decider_rr + loss_D_decider_fr
 
     def backward_G(self, fr_pair, real_images, update=True, prob_flip_labels=0.0):
 

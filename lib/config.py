@@ -65,28 +65,28 @@ class Config():
         ## GAN options
         self.N_INPUT = (self.SENTENCE_LENGTH + self.NOISE_LENGTH) * self.WV_SIZE
         self.NGF = 128
-        self.NDF = 96
+        self.NDF = 64
         self.NG_REF_F = 64
-        self.ND_DEC_F = 48
-        self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.LAMBDA_L1 = 1.0
+        self.ND_DEC_F = 32
+        self.GAN_LOSS1 = 'lsgan'    ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.GAN_LOSS2 = 'lsgan'    ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.USE_SPECTRAL_NORM = True
         self.USE_DROPOUT = True
-        self.N_BLOCKS = 6
+        self.N_BLOCKS = 9
         self.PADDING_TYPE = 'reflect'   ## One of 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
         self.TRAIN_G_TREND = 1    ## e.g. Train G for each 1 epoch, freeze at others
         self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
-        self.BATCH_SIZE = 4
+        self.BATCH_SIZE = 16
         self.N_EPOCHS = 2000
-        self.G_LR = 1e-5
-        self.D_LR = 1e-5
-        self.G_REFINER_LR = 1e-5
-        self.D_DECIDER_LR = 1e-5
+        self.G_LR = 1e-4
+        self.D_LR = 2e-4
+        self.G_REFINER_LR = 1e-4
+        self.D_DECIDER_LR = 2e-4
         self.LR_DROP_FACTOR = 0.5
         self.LR_DROP_PATIENCE = self.N_EPOCHS // 10
         self.LR_MIN_VAL = 1e-6

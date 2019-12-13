@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=5.0, D_yticks=5.0):
+def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=20.0, D_yticks=0.1):
     assert mode in ['train', 'val'], "{} not available. Choose one of ['train', 'val']".format(mode)
 
     length = len(df.index)
@@ -44,7 +44,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=5.0, D_yticks
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, 2.0))
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, G_yticks))
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot D decider loss
@@ -55,7 +55,7 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=5.0, D_yticks
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, 2.0))
+    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, D_yticks))
     plt.plot(df['Iteration'], df[col_name])
 
     ## Plot D real-real accuracy

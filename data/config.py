@@ -15,8 +15,8 @@ class Config():
         ## Data preprocess
         self.MIN_SENTENCE_LENGTH = 2
         self.MAX_SENTENCE_LENGTH = 16
-        self.MIN_IMAGE_WIDTH = 100
-        self.MIN_IMAGE_HEIGHT = 100
+        self.MIN_IMAGE_WIDTH = 50
+        self.MIN_IMAGE_HEIGHT = 50
         self.MAX_IMAGE_WIDTH = 2000
         self.MAX_IMAGE_HEIGHT = 2000
 
