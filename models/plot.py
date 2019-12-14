@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=20.0, D_yticks=0.1):
+def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=2.0, D_yticks=2.0):
     assert mode in ['train', 'val'], "{} not available. Choose one of ['train', 'val']".format(mode)
 
     length = len(df.index)
@@ -28,13 +28,14 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=20.0, D_ytick
     ## Plot D loss
     net_name = 'Discriminator'
     col_name = 'D_loss'
+    df_reduced = df[np.abs(df[col_name] - df[col_name].mean()) <= (3 * df[col_name].std())]
     plt.subplot(3, 3, 2)
     plt.title("{} loss".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 1.0, D_yticks))
-    plt.plot(df['Iteration'], df[col_name])
+    plt.yticks(np.arange(min(df_reduced[col_name]), max(df_reduced[col_name]) + 1.0, D_yticks))
+    plt.plot(df_reduced['Iteration'], df_reduced[col_name])
 
     ## Plot G refiner loss
     net_name = 'Generator refiner'
@@ -50,13 +51,14 @@ def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=20.0, D_ytick
     ## Plot D decider loss
     net_name = 'Discriminator decider'
     col_name = 'D_decider_loss'
+    df_reduced = df[np.abs(df[col_name] - df[col_name].mean()) <= (3 * df[col_name].std())]
     plt.subplot(3, 3, 4)
     plt.title("{} loss".format(net_name))
     plt.xlabel("Iterations")
     plt.ylabel("Loss")
     plt.grid()
-    plt.yticks(np.arange(min(df[col_name]), max(df[col_name]) + 0.1, D_yticks))
-    plt.plot(df['Iteration'], df[col_name])
+    plt.yticks(np.arange(min(df_reduced[col_name]), max(df_reduced[col_name]) + 1.0, D_yticks))
+    plt.plot(df_reduced['Iteration'], df_reduced[col_name])
 
     ## Plot D real-real accuracy
     net_name = 'Discriminator'
