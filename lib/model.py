@@ -245,6 +245,7 @@ class GANModel(BaseModel):
         print("\tGAN loss2:", self.gan_loss2)
         # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
         print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
+        print("\Dropout rates (G, D): {:.4f}, {:.4f}".format(config.G_DROPOUT, config.D_DROPOUT))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tWeight initialization:", weight_init)

@@ -73,7 +73,8 @@ class Config():
         self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
-        self.USE_DROPOUT = True
+        self.G_DROPOUT = 0.1
+        self.D_DROPOUT = 0.5
         self.USE_SPECTRAL_NORM = True
         self.MINIBATCH_DISCRIMINATION = False
         self.N_BLOCKS = 9
