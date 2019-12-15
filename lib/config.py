@@ -47,13 +47,13 @@ class Config():
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
-        self.HORIZONTAL_FLIPPING = True
+        self.HORIZONTAL_FLIPPING = False
         self.RANDOM_ROTATION = False
-        self.COLOR_JITTERING = True
-        self.RANDOM_CHANNEL_SWAPPING = True
-        self.RANDOM_GAMMA = True
+        self.COLOR_JITTERING = False
+        self.RANDOM_CHANNEL_SWAPPING = False
+        self.RANDOM_GAMMA = False
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = True
+        self.RANDOM_RESOLUTION = False
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
