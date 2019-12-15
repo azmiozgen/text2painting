@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'united'
+        SUBSET = 'extreme'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -31,10 +31,10 @@ class Config():
         self.NORMALIZE = True
         # self.MEAN = [0.1036, 0.3302, 0.3311]
         # self.STD = [0.1233, 0.2243, 0.3484]
-        # self.MEAN = [0.5505, 0.3927, 0.4473]
-        # self.STD = [0.2245, 0.2782, 0.3102]
-        self.MEAN = [0.9036, 0.7096, 0.8660]
-        self.STD = [0.2221, 0.1697, 0.2122]
+        self.MEAN = [0.5505, 0.3927, 0.4473]
+        self.STD = [0.2245, 0.2782, 0.3102]
+        # self.MEAN = [0.9036, 0.7096, 0.8660]
+        # self.STD = [0.2221, 0.1697, 0.2122]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -68,12 +68,14 @@ class Config():
         self.NDF = 64
         self.NG_REF_F = 64
         self.ND_DEC_F = 32
-        self.GAN_LOSS1 = 'lsgan'    ## One of 'lsgan', 'vanilla', 'wgangp'
-        self.GAN_LOSS2 = 'lsgan'    ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.OUT_CHANNELS = 1
+        self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
+        self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
-        self.USE_SPECTRAL_NORM = True
         self.USE_DROPOUT = True
+        self.USE_SPECTRAL_NORM = True
+        self.MINIBATCH_DISCRIMINATION = False
         self.N_BLOCKS = 9
         self.PADDING_TYPE = 'reflect'   ## One of 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
@@ -81,7 +83,7 @@ class Config():
         self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
-        self.BATCH_SIZE = 16
+        self.BATCH_SIZE = 4
         self.N_EPOCHS = 2000
         self.G_LR = 1e-4
         self.D_LR = 2e-4

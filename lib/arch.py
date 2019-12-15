@@ -266,7 +266,9 @@ class DiscriminatorStack(nn.Module):
         n_channels = config.N_CHANNELS + 1   ## Stitching images and word vectors
         self.ndf = ndf
         self.ngf = ngf
+        self.out_channels = config.OUT_CHANNELS
         use_spectral = config.USE_SPECTRAL_NORM
+        self.minibatch_discrimination = config.MINIBATCH_DISCRIMINATION
         batch_size = config.BATCH_SIZE
 
         ## No Batch Normalization
@@ -289,7 +291,7 @@ class DiscriminatorStack(nn.Module):
                 spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ndf * 8, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)),       ## ndf * 8 x H/32 x W/32
+                spectral_norm(nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## ndf * 8 x H/32 x W/32
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
@@ -308,15 +310,16 @@ class DiscriminatorStack(nn.Module):
                 nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 8, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+                nn.Conv2d(ndf * 8, out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
                 # nn.Dropout2d(0.2)
             )
 
-        self.mbd = MiniBatchDiscrimination(ndf * 8 * 2 * 2, ndf * 4, 16, batch_size)
-        self.fc_last = nn.Linear(ndf * 8 * 2 * 2 + ndf * 4, 1)
+        if self.minibatch_discrimination:
+            self.mbd = MiniBatchDiscrimination(self.out_channels * 2 * 2, self.out_channels, 16, batch_size)
+            # self.fc_last = nn.Linear(out_channels * 2 * 2 + out_channels // 2, 1)
 
     def forward(self, image, word_vectors):
         b, _, h, w = image.size()
@@ -324,9 +327,11 @@ class DiscriminatorStack(nn.Module):
         wv_out = wv_out.view(b, 1, h, w)
         stacked = torch.cat((image, wv_out), dim=1)
         out = self.conv(stacked)
-        out = out.view(-1, self.ndf * 8 * 2 * 2)
-        out = torch.cat((out, self.mbd(out)), dim=1)
-        return self.fc_last(out)
+        if self.minibatch_discrimination:
+            out = out.view(-1, self.out_channels * 2 * 2)
+            out = torch.cat((out, self.mbd(out)), dim=1)
+            # return self.fc_last(out)
+        return out
 
 class DiscriminatorDecider(nn.Module):
     def __init__(self, config):
@@ -334,7 +339,9 @@ class DiscriminatorDecider(nn.Module):
         ndf = config.ND_DEC_F
         self.ndf = ndf
         n_channels = config.N_CHANNELS
+        self.out_channels = config.OUT_CHANNELS
         use_spectral = config.USE_SPECTRAL_NORM
+        self.minibatch_discrimination = config.MINIBATCH_DISCRIMINATION
         batch_size = config.BATCH_SIZE
 
         if use_spectral:
@@ -350,7 +357,7 @@ class DiscriminatorDecider(nn.Module):
                 spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ndf * 8, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)),       ## 1 x H/32 x W/32
+                spectral_norm(nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## 1 x H/32 x W/32
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
@@ -369,21 +376,22 @@ class DiscriminatorDecider(nn.Module):
                 nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 8, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+                nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
                 # nn.Dropout2d(0.2)
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
             )
 
-        self.mbd = MiniBatchDiscrimination(ndf * 8 * 2 * 2, ndf * 4, 16, batch_size)
-        self.fc = nn.Linear(ndf * 8 * 2 * 2 + ndf * 4, 1)
+        if self.minibatch_discrimination:
+            self.mbd = MiniBatchDiscrimination(self.out_channels * 2 * 2, self.out_channels, 16, batch_size)
 
     def forward(self, image):
         out = self.conv(image)
-        out = out.view(-1, self.ndf * 8 * 2 * 2)
-        out = torch.cat((out, self.mbd(out)), dim=1)
-        return self.fc(out)
+        if self.minibatch_discrimination:
+            out = out.view(-1, self.out_channels * 2 * 2)
+            out = torch.cat((out, self.mbd(out)), dim=1)
+        return out
 
 
 class MiniBatchDiscrimination(nn.Module):
