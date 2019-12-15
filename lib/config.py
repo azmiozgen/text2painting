@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'extreme'
+        SUBSET = 'united'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -29,12 +29,10 @@ class Config():
 
         ## Stats (Change w.r.t stats file under data/)
         self.NORMALIZE = True
-        # self.MEAN = [0.1036, 0.3302, 0.3311]
-        # self.STD = [0.1233, 0.2243, 0.3484]
-        self.MEAN = [0.5505, 0.3927, 0.4473]
-        self.STD = [0.2245, 0.2782, 0.3102]
-        # self.MEAN = [0.9036, 0.7096, 0.8660]
-        # self.STD = [0.2221, 0.1697, 0.2122]
+        self.MEAN = [0.7327, 0.9268, 0.8164]
+        self.STD = [0.3731, 0.1704, 0.2782]
+        # self.MEAN = [0.5505, 0.3927, 0.4473]
+        # self.STD = [0.2245, 0.2782, 0.3102]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
@@ -47,13 +45,13 @@ class Config():
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
-        self.HORIZONTAL_FLIPPING = False
+        self.HORIZONTAL_FLIPPING = False     ## BAD!
         self.RANDOM_ROTATION = False
-        self.COLOR_JITTERING = False
-        self.RANDOM_CHANNEL_SWAPPING = False
-        self.RANDOM_GAMMA = False
+        self.COLOR_JITTERING = True
+        self.RANDOM_CHANNEL_SWAPPING = True
+        self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = False
+        self.RANDOM_RESOLUTION = True
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
@@ -74,9 +72,9 @@ class Config():
         self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.G_DROPOUT = 0.1
-        self.D_DROPOUT = 0.5
+        self.D_DROPOUT = 0.7
         self.USE_SPECTRAL_NORM = True
-        self.MINIBATCH_DISCRIMINATION = False
+        self.MINIBATCH_DISCRIMINATION = True
         self.N_BLOCKS = 9
         self.PADDING_TYPE = 'reflect'   ## One of 'reflect', 'replicate', 'zero'
         self.TRAIN_D_TREND = 1    ## e.g. Train D for each 3 epoch, freeze at others
@@ -85,7 +83,7 @@ class Config():
 
         ## Hyper-params
         self.BATCH_SIZE = 4
-        self.N_EPOCHS = 2000
+        self.N_EPOCHS = 10000
         self.G_LR = 1e-4
         self.D_LR = 2e-4
         self.G_REFINER_LR = 1e-4
@@ -111,8 +109,8 @@ class Config():
         # self.N_GRID_ROW = 8
         self.N_PRINT_BATCH = 20
         self.N_LOG_BATCH = 30
-        self.N_SAVE_VISUALS_BATCH = 30
-        self.N_SAVE_MODEL_EPOCHS = 100
+        self.N_SAVE_VISUALS_BATCH = 50
+        self.N_SAVE_MODEL_EPOCHS = 200
         self.N_GRID_ROW = 8
 
         ## Misc
