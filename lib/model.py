@@ -537,8 +537,9 @@ class GANModel(BaseModel):
             ## Get words from word vectors
             for _real_wv in real_wv:
                 _real_wv = np.array(_real_wv)
-                word, _ = word2vec_model.wv.similar_by_vector(_real_wv)[0]
-                words.append(word)
+                word, prob = word2vec_model.wv.similar_by_vector(_real_wv)[0]
+                if prob > 0.95:  ## Eliminate noise words
+                    words.append(word)
 
             ## Unique words are visualized by converting into image
             words = np.unique(words)

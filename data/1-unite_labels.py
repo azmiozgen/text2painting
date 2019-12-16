@@ -13,6 +13,7 @@ from config import Config
 if __name__ == '__main__':
 
     # SUBSET_LIST = ['deviantart', 'wikiart']
+    #SUBSET_LIST = ['deviantart_1', 'deviantart_2', 'deviantart_3', 'deviantart_4']
     SUBSET_LIST = ['deviantart_verified']
     FRACTION = 1.0  ## To prepare smaller dataset, make 1.0 to take all
 
@@ -65,7 +66,7 @@ if __name__ == '__main__':
             try:
                 img = Image.open(image_file) 
                 if img.mode != 'RGB': 
-                    img = img.convert('RGB') 
+                    continue
             except (Exception, Warning) as e:
                 print("Bad image", image_file, e)
                 continue
@@ -75,6 +76,8 @@ if __name__ == '__main__':
             if w < config.MIN_IMAGE_WIDTH or w > config.MAX_IMAGE_WIDTH:
                 continue
             if h < config.MIN_IMAGE_HEIGHT or w > config.MAX_IMAGE_HEIGHT:
+                continue
+            if max(w, h) / (min(w, h) + 1e-7) > config.MAX_ASPECT_RATIO:
                 continue
 
             ## Normalize tokens

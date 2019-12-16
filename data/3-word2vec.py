@@ -20,9 +20,17 @@ class StemmingLemmatization():
     def __init__(self, label_sentences):
         self.nlp = spacy.load('en', disable=['ner', 'parser']) # disabling Named Entity Recognition for speed
         self.label_sentences = label_sentences
+        self.lookup = {'christmas': 'christmas'}
 
     def _clean_doc(self, doc):
-        txt = [token.lemma_ for token in doc if not token.is_stop]
+        txt = []
+        for token in doc:
+            if token.text in self.lookup:
+                txt.append(self.lookup[token.text])
+            else:
+                if not token.is_stop:
+                    txt.append(token.lemma_)
+        # txt = [token.lemma_ for token in doc if not token.is_stop]
         if len(txt) > 0:
             return ' '.join(txt)
 
@@ -156,4 +164,3 @@ if __name__ == "__main__":
     #     print("Top {} similar words to {}".format(TOP_N, keyword))
     #     for word in similar_words:
     #         print('\t', word)
-
