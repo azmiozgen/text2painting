@@ -112,7 +112,6 @@ class GANModel(BaseModel):
 
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
-        # self.G_refiner = GeneratorRefiner(config).to(self.device)
         self.G_refiner = GeneratorRefinerUNet(config).to(self.device)
 
         ## Init D, optimizers, schedulers

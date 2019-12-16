@@ -42,12 +42,12 @@ if __name__ == "__main__":
     val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
     train_loader = DataLoader(train_dataset,
                               batch_size=CONFIG.BATCH_SIZE,
-                              shuffle=True,
+                              shuffle=False,
                               num_workers=CONFIG.N_WORKERS,
                               pin_memory=True,
                               collate_fn=train_align_collate,
-                            #   sampler=train_batch_sampler,
-                              drop_last=True,
+                              sampler=train_batch_sampler,
+                            #   drop_last=True,
                               )
     val_loader = DataLoader(val_dataset,
                             batch_size=CONFIG.BATCH_SIZE,
@@ -55,8 +55,8 @@ if __name__ == "__main__":
                             num_workers=CONFIG.N_WORKERS,
                             pin_memory=True,
                             collate_fn=val_align_collate,
-                            # sampler=val_batch_sampler,
-                            drop_last=True,
+                            sampler=val_batch_sampler,
+                            # drop_last=True,
                             )
     print("\tTrain size:", len(train_dataset))
     print("\tValidation size:", len(val_dataset))

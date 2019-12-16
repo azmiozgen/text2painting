@@ -354,7 +354,7 @@ class AlignCollate(object):
         return images_tensor, word_vectors_tensor, fake_word_vectors_tensor
 
 
-class ImageBatchSampler(Sampler):
+class ImageBatchSamplerAlt(Sampler):
     '''
         Group image files by their groups.
     '''
@@ -455,7 +455,7 @@ class ImageBatchSampler(Sampler):
     def __len__(self):
         return len(self.df.index)
 
-class ImageBatchSamplerAlt(Sampler):
+class ImageBatchSampler(Sampler):
     '''
         Group image files by their image sizes # of labels and sample similar from images.
     '''

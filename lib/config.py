@@ -8,7 +8,7 @@ class Config():
 
         ## Files and names
         self.BASE_DIR = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-        SUBSET = 'united'
+        SUBSET = 'verified'
         self.DATA_DIR = os.path.join(self.BASE_DIR, 'data', SUBSET)
         self.MODEL_DIR = os.path.join(self.BASE_DIR, 'models')
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
@@ -23,25 +23,24 @@ class Config():
         self.IMAGE_WIDTH = 64
         self.IMAGE_HEIGHT = 64
         self.N_CHANNELS = 3
-        # assert self.SENTENCE_LENGTH * self.WV_SIZE == self.IMAGE_WIDTH * self.IMAGE_HEIGHT, \
-        #        "Incompatible shapes {} x {} != {} x {}".format(self.SENTENCE_LENGTH, self.WV_SIZE, \
-        #                                                        self.IMAGE_WIDTH, self.IMAGE_HEIGHT)
 
         ## Stats (Change w.r.t stats file under data/)
         self.NORMALIZE = True
-        self.MEAN = [0.7327, 0.9268, 0.8164]
-        self.STD = [0.3731, 0.1704, 0.2782]
+        # self.MEAN = [0.5, 0.5, 0.5]
+        # self.STD = [0.5, 0.5, 0.5]
         # self.MEAN = [0.5505, 0.3927, 0.4473]
         # self.STD = [0.2245, 0.2782, 0.3102]
+        self.MEAN = [0.485, 0.456, 0.406]
+        self.STD = [0.229, 0.224, 0.225]
 
         ## Batch sampler
         self.SHUFFLE_GROUPS = True
-        # self.GROUP_N_LABELS_RANGES = [-1, 5, 7, 11, 1000]
+        self.GROUP_N_LABELS_RANGES = [-1, 5, 1000]
         # self.GROUP_N_LABELS_RANGES = [0, 10000]
-        # self.GROUP_WIDTH_RANGES = [-1, 500, 700, 1000, 100000]
-        self.GROUP_WIDTH_RANGES = [-1, 100000]
-        # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
-        self.GROUP_HEIGHT_RANGES = [-1, 100000]
+        self.GROUP_WIDTH_RANGES = [-1, 500, 100000]
+        # self.GROUP_WIDTH_RANGES = [-1, 100000]
+        self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        # self.GROUP_HEIGHT_RANGES = [-1, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
@@ -65,7 +64,7 @@ class Config():
         self.NGF = 128
         self.NDF = 64
         self.NG_REF_F = 64
-        self.ND_DEC_F = 32
+        self.ND_DEC_F = 48
         self.OUT_CHANNELS = 1
         self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
@@ -82,8 +81,8 @@ class Config():
         self.PROB_FLIP_LABELS = 0.05   ## Flip real-fake labels. 0.0 for no flip
 
         ## Hyper-params
-        self.BATCH_SIZE = 4
-        self.N_EPOCHS = 10000
+        self.BATCH_SIZE = 16
+        self.N_EPOCHS = 1000
         self.G_LR = 1e-4
         self.D_LR = 2e-4
         self.G_REFINER_LR = 1e-4
@@ -107,10 +106,10 @@ class Config():
         # self.N_SAVE_VISUALS_BATCH = 100
         # self.N_SAVE_MODEL_EPOCHS = 20
         # self.N_GRID_ROW = 8
-        self.N_PRINT_BATCH = 20
-        self.N_LOG_BATCH = 30
+        self.N_PRINT_BATCH = 50
+        self.N_LOG_BATCH = 50
         self.N_SAVE_VISUALS_BATCH = 50
-        self.N_SAVE_MODEL_EPOCHS = 200
+        self.N_SAVE_MODEL_EPOCHS = 10
         self.N_GRID_ROW = 8
 
         ## Misc

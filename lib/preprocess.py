@@ -49,14 +49,14 @@ def crop_edges_lr(img):
 def crop(img, i, j, h, w):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     return img.crop((j, i, j + w, i + h))
 
 def resize(img, size, interpolation=Image.BILINEAR):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
     if not (isinstance(size, int) or (isinstance(size, collections.Iterable) and len(size) == 2)):
         raise TypeError('Got inappropriate size arg: {}'.format(size))
 
@@ -77,7 +77,7 @@ def resize(img, size, interpolation=Image.BILINEAR):
 
 def resized_crop(img, i, j, h, w, size, interpolation=Image.BILINEAR):
 
-    assert _is_pil_image(img), 'img should be PIL Image'
+    assert _is_pil_image(img), 'Image should be PIL Image'
     img = crop(img, i, j, h, w)
     img = resize(img, size, interpolation)
     return img
@@ -124,7 +124,7 @@ class RandomResizedCrop(object):
 def hflip(img):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     return img.transpose(Image.FLIP_LEFT_RIGHT)
 
@@ -144,7 +144,7 @@ def rotate(img, angle, resample=Image.BILINEAR, expand=True):
 def rotate_with_random_bg(img, angle, resample=Image.BILINEAR, expand=True):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     img_np = np.array(img)
 
@@ -185,7 +185,7 @@ class RandomRotate(object):
 def swap_channels(img):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     img_np = np.array(img)
 
@@ -209,7 +209,7 @@ class RandomChannelSwap(object):
 def adjust_gamma(img, gamma, gain=1):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     if gamma < 0:
         raise ValueError('Gamma should be a non-negative real number')
@@ -236,7 +236,7 @@ class RandomGamma(object):
 def random_resolution(img, ratio):
 
     if not _is_pil_image(img):
-        raise TypeError('img should be PIL Image. Got {}'.format(type(img)))
+        raise TypeError('Image should be PIL Image. Got {}'.format(type(img)))
 
     img_size = np.array(img.size)
     new_size = (img_size * ratio).astype('int')

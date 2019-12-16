@@ -71,6 +71,41 @@ class ResnetBlock(nn.Module):
         out = x + self.conv_block(x)  # add skip connections
         return out
 
+class UNetDown(nn.Module):
+    def __init__(self, in_size, out_size, normalize=True, dropout=0.0, use_spectral=True):
+        super(UNetDown, self).__init__()
+        if use_spectral:
+            layers = [spectral_norm(nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False))]
+        else:
+            layers = [nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False)]
+        if normalize:
+            layers.append(nn.InstanceNorm2d(out_size))
+        layers.append(nn.LeakyReLU(0.2))
+        if dropout:
+            layers.append(nn.Dropout(dropout))
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.model(x)
+
+class UNetUp(nn.Module):
+    def __init__(self, in_size, out_size, dropout=0.0):
+        super(UNetUp, self).__init__()
+        layers = [
+            nn.ConvTranspose2d(in_size, out_size, 4, 2, 1, bias=False),
+            nn.InstanceNorm2d(out_size),
+            nn.ReLU(inplace=True),
+        ]
+        if dropout:
+            layers.append(nn.Dropout(dropout))
+
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x, skip_input):
+        x = self.model(x)
+        x = torch.cat((x, skip_input), 1)
+
+        return x
 
 class GeneratorResNet(nn.Module):
 
@@ -153,108 +188,43 @@ class GeneratorResNet(nn.Module):
 
         return out
 
-class GeneratorRefiner(nn.Module):
-
+class GeneratorRefinerUNet(nn.Module):
     def __init__(self, config):
-        super(GeneratorRefiner, self).__init__()
+        super(GeneratorRefinerUNet, self).__init__()
 
         n_channels = config.N_CHANNELS
+        n_input = config.N_INPUT
         ngf = config.NG_REF_F
-        self.ngf = ngf
         self.norm_layer = config.NORM_LAYER
         self.use_spectral = config.USE_SPECTRAL_NORM
-        self.dropout = config.G_DROPOUT
-        self.padding_type = config.PADDING_TYPE
-        n_blocks = config.N_BLOCKS
-        assert(n_blocks >= 0)
+        dropout = config.G_DROPOUT
 
-        if type(self.norm_layer) == functools.partial:
-            self.use_bias = self.norm_layer.func == nn.InstanceNorm2d
-        else:
-            self.use_bias = self.norm_layer == nn.InstanceNorm2d
+        self.down1 = UNetDown(n_channels, ngf, normalize=False, use_spectral=self.use_spectral)
+        self.down2 = UNetDown(ngf, ngf * 2, use_spectral=self.use_spectral)
+        self.down3 = UNetDown(ngf * 2, ngf * 4, use_spectral=self.use_spectral)
+        self.down4 = UNetDown(ngf * 4, ngf * 8, dropout=dropout, use_spectral=self.use_spectral)
 
-        if self.use_spectral:
-            self.downsample = [                                                         ## 3 x H x W
-                spectral_norm(nn.Conv2d(n_channels, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False)),      ## ngf x H/2 x W/2
-                nn.BatchNorm2d(ngf * 2),
-                nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ngf * 2, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False)),       ## ngf x H/4 x W/4
-                nn.BatchNorm2d(ngf * 4),
-                nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False)),            ## ngf x H/8 x W/8
-                # nn.BatchNorm2d(ngf * 4),
-                # nn.LeakyReLU(0.2, inplace=True),
-                # nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
-                # nn.BatchNorm2d(ngf * 8),
-                # nn.LeakyReLU(0.2, inplace=True),
-                # nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
-                nn.Dropout2d(self.dropout)
-            ]
-        else:
-            self.downsample = [                                                         ## 3 x H x W
-                nn.Conv2d(n_channels, ngf, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf x H/2 x W/2
-                nn.BatchNorm2d(ngf),
-                nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ngf, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False),       ## ngf x H/4 x W/4
-                nn.BatchNorm2d(ngf * 2),
-                nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ngf * 2, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False),            ## ngf x H/8 x W/8
-                # nn.BatchNorm2d(ngf * 4),
-                # nn.LeakyReLU(0.2, inplace=True),
-                # nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
-                # nn.BatchNorm2d(ngf * 8),
-                # nn.LeakyReLU(0.2, inplace=True),
-                # nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
-                nn.Dropout2d(self.dropout)
-            ]
+        self.up1 = UNetUp(ngf * 8, ngf * 8, dropout=dropout)
+        self.up2 = UNetUp(ngf * 8 + ngf * 4, ngf * 4, dropout=dropout)
+        self.up3 = UNetUp(ngf * 4 + ngf * 2, ngf * 2, dropout=dropout)
 
-        # if self.dropout:
-        #     self.downsample += [nn.Dropout2d(0.5)]
-        self.downsample = nn.Sequential(*self.downsample)
+        self.final = nn.Sequential(
+            nn.Upsample(scale_factor=2),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(ngf * 2 + ngf, n_channels, 4, padding=1),
+            nn.Tanh(),
+        )
 
-        # self.block1 = self._build_blocks(ngf * 4, n_blocks)
-        self.upsample1 = upsample_block(ngf * 8, ngf * 4, dropout=self.dropout)           # ngf x H x W -> ngf/2 x 2H x 2W
-        self.upsample2 = upsample_block(ngf * 4, ngf * 2, dropout=self.dropout)      # -> ngf/4 x 4H x 4W
-        self.upsample3 = upsample_block(ngf * 2, ngf, dropout=self.dropout)      # -> ngf/8 x 8H x 8W
-        # self.upsample4 = upsample_block(ngf, ngf // 2, dropout=self.dropout)     # -> ngf/16 x 16H x 16W
-        # self.upsample5 = upsample_block(ngf // 2, 3, dropout=self.dropout)     # -> ngf/16 x 32H x 32W
-        self.block = self._build_blocks(ngf, n_blocks)
+    def forward(self, x):
+        d1 = self.down1(x)
+        d2 = self.down2(d1)
+        d3 = self.down3(d2)
+        d4 = self.down4(d3)
+        u1 = self.up1(d4, d3)
+        u2 = self.up2(u1, d2)
+        u3 = self.up3(u2, d1)
 
-        if self.use_spectral:
-            self.finish = nn.Sequential(
-                                       nn.ReflectionPad2d(3),
-                                       spectral_norm(nn.Conv2d(ngf, 3, kernel_size=7, padding=0)),    # 3 x 16H x 16W
-                                       nn.Tanh()
-                                       )
-        else:
-            self.finish = nn.Sequential(
-                                       nn.ReflectionPad2d(3),
-                                       nn.Conv2d(ngf // 2, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
-                                       nn.Tanh()
-                                       )
-
-    def _build_blocks(self, channel, n_blocks):
-        blocks = []
-        for i in range(n_blocks):       # add ResNet blocks
-            blocks += [ResnetBlock(channel,
-                                    padding_type=self.padding_type,
-                                    norm_layer=self.norm_layer,
-                                    dropout=self.dropout,
-                                    use_bias=self.use_bias,
-                                    use_spectral=self.use_spectral)
-                                    ]
-        blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
-        return blocks
-
-    def forward(self, image):
-        out = self.downsample(image)
-        out = self.upsample1(out)
-        out = self.upsample2(out)
-        out = self.upsample3(out)
-        out = self.block(out)
-        out = self.finish(out)
-
-        return out
+        return self.final(u3)
 
 class DiscriminatorStack(nn.Module):
     def __init__(self, config):
@@ -403,7 +373,6 @@ class DiscriminatorDecider(nn.Module):
             out = torch.cat((out, self.mbd(out)), dim=1)
         return out
 
-
 class MiniBatchDiscrimination(nn.Module):
     def __init__(self, A, B, C, batch_size):
         super(MiniBatchDiscrimination, self).__init__()
@@ -439,82 +408,108 @@ class MiniBatchDiscrimination(nn.Module):
         stddev = 1 / self.feat_num
         self.T.data.uniform_(stddev)
 
-class UNetDown(nn.Module):
-    def __init__(self, in_size, out_size, normalize=True, dropout=0.0, use_spectral=True):
-        super(UNetDown, self).__init__()
-        if use_spectral:
-            layers = [spectral_norm(nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False))]
-        else:
-            layers = [nn.Conv2d(in_size, out_size, 4, 2, 1, bias=False)]
-        if normalize:
-            layers.append(nn.InstanceNorm2d(out_size))
-        layers.append(nn.LeakyReLU(0.2))
-        if dropout:
-            layers.append(nn.Dropout(dropout))
-        self.model = nn.Sequential(*layers)
+class GeneratorRefiner(nn.Module):
 
-    def forward(self, x):
-        return self.model(x)
-
-class UNetUp(nn.Module):
-    def __init__(self, in_size, out_size, dropout=0.0):
-        super(UNetUp, self).__init__()
-        layers = [
-            nn.ConvTranspose2d(in_size, out_size, 4, 2, 1, bias=False),
-            nn.InstanceNorm2d(out_size),
-            nn.ReLU(inplace=True),
-        ]
-        if dropout:
-            layers.append(nn.Dropout(dropout))
-
-        self.model = nn.Sequential(*layers)
-
-    def forward(self, x, skip_input):
-        x = self.model(x)
-        x = torch.cat((x, skip_input), 1)
-
-        return x
-
-class GeneratorRefinerUNet(nn.Module):
     def __init__(self, config):
-        super(GeneratorRefinerUNet, self).__init__()
+        super(GeneratorRefiner, self).__init__()
 
         n_channels = config.N_CHANNELS
-        n_input = config.N_INPUT
         ngf = config.NG_REF_F
         self.ngf = ngf
         self.norm_layer = config.NORM_LAYER
         self.use_spectral = config.USE_SPECTRAL_NORM
-        dropout = config.G_DROPOUT
+        self.dropout = config.G_DROPOUT
         self.padding_type = config.PADDING_TYPE
+        n_blocks = config.N_BLOCKS
+        assert(n_blocks >= 0)
 
-        self.down1 = UNetDown(n_channels, 64, normalize=False, use_spectral=self.use_spectral)
-        self.down2 = UNetDown(64, 128, use_spectral=self.use_spectral)
-        self.down3 = UNetDown(128, 256, use_spectral=self.use_spectral)
-        self.down4 = UNetDown(256, 512, dropout=dropout, use_spectral=self.use_spectral)
+        if type(self.norm_layer) == functools.partial:
+            self.use_bias = self.norm_layer.func == nn.InstanceNorm2d
+        else:
+            self.use_bias = self.norm_layer == nn.InstanceNorm2d
 
-        self.up1 = UNetUp(512, 512, dropout=dropout)
-        self.up2 = UNetUp(512 + 256, 256, dropout=dropout)
-        self.up3 = UNetUp(256 + 128, 128, dropout=dropout)
+        if self.use_spectral:
+            self.downsample = [                                                         ## 3 x H x W
+                spectral_norm(nn.Conv2d(n_channels, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False)),      ## ngf x H/2 x W/2
+                nn.BatchNorm2d(ngf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ngf * 2, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False)),       ## ngf x H/4 x W/4
+                nn.BatchNorm2d(ngf * 4),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False)),            ## ngf x H/8 x W/8
+                # nn.BatchNorm2d(ngf * 4),
+                # nn.LeakyReLU(0.2, inplace=True),
+                # nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
+                # nn.BatchNorm2d(ngf * 8),
+                # nn.LeakyReLU(0.2, inplace=True),
+                # nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
+                nn.Dropout2d(self.dropout)
+            ]
+        else:
+            self.downsample = [                                                         ## 3 x H x W
+                nn.Conv2d(n_channels, ngf, kernel_size=4, stride=2, padding=1, bias=False),      ## ngf x H/2 x W/2
+                nn.BatchNorm2d(ngf),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ngf, ngf * 2, kernel_size=4, stride=2, padding=1, bias=False),       ## ngf x H/4 x W/4
+                nn.BatchNorm2d(ngf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ngf * 2, ngf * 4, kernel_size=4, stride=2, padding=1, bias=False),            ## ngf x H/8 x W/8
+                # nn.BatchNorm2d(ngf * 4),
+                # nn.LeakyReLU(0.2, inplace=True),
+                # nn.Conv2d(ngf * 4, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/16 x W/16
+                # nn.BatchNorm2d(ngf * 8),
+                # nn.LeakyReLU(0.2, inplace=True),
+                # nn.Conv2d(ngf * 8, ngf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ngf x H/32 x W/32
+                nn.Dropout2d(self.dropout)
+            ]
 
-        self.final = nn.Sequential(
-            nn.Upsample(scale_factor=2),
-            nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(128 + 64, n_channels, 4, padding=1),
-            nn.Tanh(),
-        )
+        # if self.dropout:
+        #     self.downsample += [nn.Dropout2d(0.5)]
+        self.downsample = nn.Sequential(*self.downsample)
 
-    def forward(self, x):
-        # U-Net generator with skip connections from encoder to decoder
-        d1 = self.down1(x)
-        d2 = self.down2(d1)
-        d3 = self.down3(d2)
-        d4 = self.down4(d3)
-        u1 = self.up1(d4, d3)
-        u2 = self.up2(u1, d2)
-        u3 = self.up3(u2, d1)
+        # self.block1 = self._build_blocks(ngf * 4, n_blocks)
+        self.upsample1 = upsample_block(ngf * 8, ngf * 4, dropout=self.dropout)           # ngf x H x W -> ngf/2 x 2H x 2W
+        self.upsample2 = upsample_block(ngf * 4, ngf * 2, dropout=self.dropout)      # -> ngf/4 x 4H x 4W
+        self.upsample3 = upsample_block(ngf * 2, ngf, dropout=self.dropout)      # -> ngf/8 x 8H x 8W
+        # self.upsample4 = upsample_block(ngf, ngf // 2, dropout=self.dropout)     # -> ngf/16 x 16H x 16W
+        # self.upsample5 = upsample_block(ngf // 2, 3, dropout=self.dropout)     # -> ngf/16 x 32H x 32W
+        self.block = self._build_blocks(ngf, n_blocks)
 
-        return self.final(u3)
+        if self.use_spectral:
+            self.finish = nn.Sequential(
+                                       nn.ReflectionPad2d(3),
+                                       spectral_norm(nn.Conv2d(ngf, 3, kernel_size=7, padding=0)),    # 3 x 16H x 16W
+                                       nn.Tanh()
+                                       )
+        else:
+            self.finish = nn.Sequential(
+                                       nn.ReflectionPad2d(3),
+                                       nn.Conv2d(ngf // 2, 3, kernel_size=7, padding=0),    # 3 x 16H x 16W
+                                       nn.Tanh()
+                                       )
+
+    def _build_blocks(self, channel, n_blocks):
+        blocks = []
+        for i in range(n_blocks):       # add ResNet blocks
+            blocks += [ResnetBlock(channel,
+                                    padding_type=self.padding_type,
+                                    norm_layer=self.norm_layer,
+                                    dropout=self.dropout,
+                                    use_bias=self.use_bias,
+                                    use_spectral=self.use_spectral)
+                                    ]
+        blocks = nn.Sequential(*blocks)                  # -> ngf x H x W
+        return blocks
+
+    def forward(self, image):
+        out = self.downsample(image)
+        out = self.upsample1(out)
+        out = self.upsample2(out)
+        out = self.upsample3(out)
+        out = self.block(out)
+        out = self.finish(out)
+
+        return out
 
 class GeneratorSimple(nn.Module):
     def __init__(self, config):
@@ -612,6 +607,49 @@ class GeneratorStack(nn.Module):
         out = self.image(out)
 
         return out
+
+class GeneratorUNet(nn.Module):
+    def __init__(self, config):
+        super(GeneratorUNet, self).__init__()
+
+        n_channels = config.N_CHANNELS
+        n_input = config.N_INPUT
+        ngf = config.NGF
+        use_spectral = config.USE_SPECTRAL_NORM
+        dropout = config.G_DROPOUT
+
+        self.fc = nn.Sequential(
+                               nn.Linear(n_input, ngf * 4 * 4, bias=False),
+                               nn.ReLU(True),
+                               nn.Dropout(dropout)
+                               )
+
+        self.up1 = UNetUp(ngf, ngf)
+        self.up2 = UNetUp(ngf, ngf // 2)
+        self.up3 = UNetUp(ngf // 2, ngf // 4)
+        self.up4 = UNetUp(ngf // 4, ngf // 8, dropout=dropout)
+
+        # self.down1 = UNetDown(ngf // 8, ngf // 4, dropout=dropout, use_spectral=use_spectral)
+        # self.down2 = UNetDown(ngf // 4 + ngf // 4, ngf // 4, dropout=dropout, use_spectral=use_spectral)
+        # self.down3 = UNetDown(ngf // 4 + ngf // 2, ngf // 4, dropout=dropout, use_spectral=use_spectral)
+
+        self.final = nn.Sequential(
+            nn.Upsample(scale_factor=2),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(ngf // 4 + ngf, n_channels, 4, padding=1),
+            nn.Tanh(),
+        )
+
+    def forward(self, x):
+        u1 = self.up1(x)
+        u2 = self.up2(u1)
+        u3 = self.up3(u2)
+        u4 = self.up4(u3)
+        # d1 = self.down1(u4, u3)
+        # d2 = self.down2(d1, u2)
+        # d3 = self.down3(d2, u1)
+
+        return self.final(d3)
 
 if __name__ == '__main__':
     from config import Config
