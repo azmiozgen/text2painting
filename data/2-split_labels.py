@@ -19,8 +19,8 @@ if __name__ == '__main__':
     VAL_OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'val_labels.csv')
     TEST_OUTPUT_FILE = os.path.join(OUTPUT_DIR, 'test_labels.csv')
 
-    VAL_RATIO = 0.1
-    TEST_RATIO = 0.1
+    VAL_RATIO = 0.25
+    TEST_RATIO = 0.0
     SEED = 73
 
     if not os.path.isfile(ALL_LABELS_FILE):

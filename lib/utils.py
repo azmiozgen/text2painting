@@ -201,14 +201,15 @@ def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
 
 def words2image(text_list, config):
-    
-
     w = config.IMAGE_WIDTH
     h = config.IMAGE_HEIGHT
     n_column = config.WORDS2IMAGE_N_COLUMN
 
     img = Image.fromarray(np.ones((h, w)))
     draw = ImageDraw.Draw(img)
+
+    if len(text_list) == 0:
+        return np.array(img.convert('RGB'))
 
     ## Look for fonts
     for font in config.FONTS:

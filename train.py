@@ -38,16 +38,16 @@ if __name__ == "__main__":
     val_dataset = TextArtDataLoader(CONFIG, mode='val')
     train_align_collate = AlignCollate(CONFIG, 'train')
     val_align_collate = AlignCollate(CONFIG, 'val')
-    train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
-    val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
+    # train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
+    # val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
     train_loader = DataLoader(train_dataset,
                               batch_size=CONFIG.BATCH_SIZE,
-                              shuffle=False,
+                              shuffle=True,
                               num_workers=CONFIG.N_WORKERS,
                               pin_memory=True,
                               collate_fn=train_align_collate,
-                              sampler=train_batch_sampler,
-                            #   drop_last=True,
+                            #   sampler=train_batch_sampler,
+                              drop_last=True,
                               )
     val_loader = DataLoader(val_dataset,
                             batch_size=CONFIG.BATCH_SIZE,
@@ -55,8 +55,8 @@ if __name__ == "__main__":
                             num_workers=CONFIG.N_WORKERS,
                             pin_memory=True,
                             collate_fn=val_align_collate,
-                            sampler=val_batch_sampler,
-                            # drop_last=True,
+                            # sampler=val_batch_sampler,
+                            drop_last=True,
                             )
     print("\tTrain size:", len(train_dataset))
     print("\tValidation size:", len(val_dataset))
@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 iteration = (epoch - 1) * n_batch + i
 
                 ## Get data
-                real_images, real_wvs, fake_wvs = data
+                real_first_images, real_images, real_wvs, fake_wvs = data
                 batch_size = real_images.size()[0]
 
                 ## Fit batch

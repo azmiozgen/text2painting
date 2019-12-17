@@ -88,26 +88,22 @@ class TextArtDataLoader(Dataset):
     def __getitem__(self, index):
         image_file = self.image_files[index]
 
-        #####start = time.time()
         # Load image
         img = self.load(image_file)
         # img = self.preprocess(img)
-        #####print("Image load: {:.4f}".format(time.time() - start))
 
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]
         word_vectors = []
 
-        #####start = time.time()
         for word in label_sentence: 
             vector = self.get_word_vector(word)
             if vector is not None:
                 word_vectors.append(vector)
-        #####print("Get word vector: {:.4f}".format(time.time() - start))
 
-        ## If empty, make zero vector
+        ## If empty, make noisy vector (-1, 1)
         if len(word_vectors) == 0:
-            word_vectors_tensor = torch.zeros(1, self.word2vec_model.vector_size)
+            word_vectors_tensor = torch.rand(1, self.word2vec_model.vector_size) * 2.0 - 1.0
         else:
             word_vectors_tensor = torch.Tensor(word_vectors)
 
@@ -128,8 +124,10 @@ class AlignCollate(object):
         self.normalize = config.NORMALIZE
         self.mean = config.MEAN
         self.std = config.STD
-        self.image_height = config.IMAGE_HEIGHT
+        self.image_width_first = config.IMAGE_WIDTH_FIRST
+        self.image_height_first = config.IMAGE_HEIGHT_FIRST
         self.image_width = config.IMAGE_WIDTH
+        self.image_height = config.IMAGE_HEIGHT
         self.horizontal_flipping = config.HORIZONTAL_FLIPPING
         self.random_rotation = config.RANDOM_ROTATION
         self.color_jittering = config.COLOR_JITTERING
@@ -173,11 +171,12 @@ class AlignCollate(object):
             if self.random_grayscale:
                 self.grayscaler = ImageUtilities.image_random_grayscaler(p=0.5)
 
+        self.resizer_first = ImageUtilities.image_resizer(self.image_height_first, self.image_width_first)
         self.resizer = ImageUtilities.image_resizer(self.image_height, self.image_width)
         self.normalizer = ImageUtilities.image_normalizer(self.mean, self.std)
 
-    def __preprocess(self, image):
-
+    def __preprocess(self, image, first):
+        ## 'first' for smaller image resizing for levels of GAN (first level 64x64 second level is 128x128)
         if self._mode == 'train':
 
             image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
@@ -214,7 +213,11 @@ class AlignCollate(object):
             if self.random_grayscale:
                 image = self.grayscaler(image)
 
-        image = self.resizer(image)
+        if first:
+            image = self.resizer_first(image)
+        else:
+            image = self.resizer(image)
+
         if self.normalize:
             image = self.normalizer(image)  ## Does 'to_tensor'
         else:
@@ -239,16 +242,26 @@ class AlignCollate(object):
     def _get_word_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
         word, prob = self.word2vec_model.wv.similar_by_vector(word_vector, topn=1)[0]
-        if prob > 0.99:
+        if prob > self.config.MIN_WV_SIMILARITY_PROB:
             return word
         else:
             return None
+
+    def _check_vector_in_vocab(self, word_vector):
+        word_vector = np.array(word_vector)
+        word, prob = self.word2vec_model.wv.similar_by_vector(word_vector, topn=1)[0]
+        return prob > self.config.MIN_WV_SIMILARITY_PROB
 
     def _clean_wvs(self, word_vectors):
         '''
         Clean word vectors by removing words that are not in vocabulary
         '''
-        return torch.Tensor(list(filter(self._get_word_by_vector, np.array(word_vectors))))
+        indices = []
+        for i, wv in enumerate(word_vectors):
+            if self._check_vector_in_vocab(wv):
+                indices.append(i)
+        return word_vectors[indices]
+        # return torch.Tensor(list(filter(self._check_vector_in_vocab, np.array(word_vectors))))
 
     def _get_similar_wv_by_vector(self, word_vector):
         word_vector = np.array(word_vector)
@@ -290,7 +303,7 @@ class AlignCollate(object):
 
     def _crop_wvs(self, word_vectors, final_length):
         '''
-        Crop word vectors randomly array to be equal to sentence length
+        Crop word vectors randomly to be equal to sentence length
         '''
         return word_vectors[torch.randperm(final_length)]
 
@@ -316,17 +329,22 @@ class AlignCollate(object):
         return fake_word_vectors
 
     def __call__(self, batch):
+        images_first = []
         images = []
         word_vectors_list = []
         fake_word_vectors_list = []
         for item in batch:
             img = item[0]
             word_vectors = item[1]
-            images.append(self.__preprocess(img))
-            word_vectors = self._normalize_wvs(word_vectors)
+            images_first.append(self.__preprocess(img, first=True))
+            images.append(self.__preprocess(img, first=False))
 
             ## Clean wvs that are not in vocab
-            # word_vectors = self._clean_wvs(word_vectors)
+            word_vectors = self._clean_wvs(word_vectors)
+
+            if len(word_vectors) == 0:
+                word_vectors = torch.rand(1, self.word2vec_model.vector_size) * 2.0 - 1.0
+            word_vectors = self._normalize_wvs(word_vectors)
 
             ## Pad or crop true wvs
             if len(word_vectors) < self.sentence_length:
@@ -347,11 +365,12 @@ class AlignCollate(object):
             fake_word_vectors = torch.Tensor(self._generate_dissimilar_wvs(word_vectors))
             fake_word_vectors_list.append(fake_word_vectors)
 
+        images_first_tensor = torch.stack(images_first)
         images_tensor = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
         fake_word_vectors_tensor = torch.stack(fake_word_vectors_list)
 
-        return images_tensor, word_vectors_tensor, fake_word_vectors_tensor
+        return images_first_tensor, images_tensor, word_vectors_tensor, fake_word_vectors_tensor
 
 
 class ImageBatchSamplerAlt(Sampler):

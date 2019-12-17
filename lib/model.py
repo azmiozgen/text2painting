@@ -6,6 +6,7 @@ import time
 import numpy as np
 from PIL import Image
 import torch
+import torchvision
 from torchvision.utils import make_grid
 
 from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefiner, DiscriminatorDecider, GeneratorRefinerUNet
@@ -109,6 +110,10 @@ class GANModel(BaseModel):
         self.lambda_l1 = config.LAMBDA_L1
         self.inv_normalize = config.NORMALIZE
         self.prob_flip_labels = config.PROB_FLIP_LABELS
+        self.min_similarity_prob = config.MIN_WV_SIMILARITY_PROB
+
+        self.inverse_normalizer = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)
+        self.image_resizer = ImageUtilities.image_resizer(self.config.IMAGE_HEIGHT, self.config.IMAGE_WIDTH, interpolation=Image.NEAREST)
 
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
@@ -243,8 +248,8 @@ class GANModel(BaseModel):
         print("\tGAN loss1:", self.gan_loss1)
         print("\tGAN loss2:", self.gan_loss2)
         # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
-        print("\tLearning rates (G, D, G_refiner, D_decider): {:.4f}, {:.4f}, {:.4f}, {:.4f}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
-        print("\tDropout rates (G, D): {:.4f}, {:.4f}".format(config.G_DROPOUT, config.D_DROPOUT))
+        print("\tLearning rates (G, D, G_refiner, D_decider): {:.2E}, {:.2E}, {:.2E}, {:.2E}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr))
+        print("\tDropout rates (G, D): {:.2f}, {:.2f}".format(config.G_DROPOUT, config.D_DROPOUT))
         print("\tAdam optimizer beta:", beta)
         print("\tWeight decay:", weight_decay)
         print("\tWeight initialization:", weight_init)
@@ -376,18 +381,19 @@ class GANModel(BaseModel):
         return net
 
     def set_inputs(self, data, fake_images, refined):
-        real_images, real_wv, fake_wv = data
+        real_first_images, real_images, real_wv, fake_wv = data
 
         real_wv = real_wv.view(self.batch_size, -1)
         fake_wv = fake_wv.view(self.batch_size, -1)
 
         ## Make pairs
+        real_real_first_pair = (real_first_images, real_wv)
         real_real_pair = (real_images, real_wv)
-        real_fake_pair = (real_images, fake_wv)
+        real_fake_pair = (real_first_images, fake_wv)
         fake_real_pair = (fake_images, real_wv)
         refined_real_pair = (refined, real_wv)
 
-        return real_real_pair, real_fake_pair, fake_real_pair, refined_real_pair
+        return real_real_first_pair, real_real_pair, real_fake_pair, fake_real_pair, refined_real_pair
 
     def backward_D(self, rr_pair, rf_pair, fr_pair, update=True, prob_flip_labels=0.0):
 
@@ -538,7 +544,7 @@ class GANModel(BaseModel):
             for _real_wv in real_wv:
                 _real_wv = np.array(_real_wv)
                 word, prob = word2vec_model.wv.similar_by_vector(_real_wv)[0]
-                if prob > 0.95:  ## Eliminate noise words
+                if prob > self.min_similarity_prob:  ## Eliminate noise words
                     words.append(word)
 
             ## Unique words are visualized by converting into image
@@ -547,16 +553,17 @@ class GANModel(BaseModel):
 
             ## Inverse normalize
             if self.inv_normalize:
-                fake_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(fake_image)
-                real_image = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(real_image)
-                _refined1 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined1)
-                # _refined2 = ImageUtilities.image_inverse_normalizer(self.config.MEAN, self.config.STD)(_refined2)
+                fake_image = self.inverse_normalizer(fake_image)
+                _refined1 = self.inverse_normalizer(_refined1)
+                # _refined2 = self.inverse_normalizer(_refined2)
+                real_image = self.inverse_normalizer(real_image)
 
             ## Go to cpu numpy array
             fake_image = fake_image.detach().cpu().numpy().transpose(1, 2, 0)
-            real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
+            fake_image = np.array(self.image_resizer(Image.fromarray((fake_image * 255.).astype(np.uint8)))) / 255.
             _refined1 = _refined1.detach().cpu().numpy().transpose(1, 2, 0)
             # _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
+            real_image = real_image.detach().cpu().numpy().transpose(1, 2, 0)
 
             # images_bag.extend([word_image, fake_image, _refined1, _refined2, real_image])
             images_bag.extend([word_image, fake_image, _refined1, real_image])
@@ -598,11 +605,12 @@ class GANModel(BaseModel):
 
     def fit(self, data, phase='train', train_D=True, train_G=True, classic=True):
         ## Data to device
-        real_images, real_wv, fake_wv = data
+        real_first_images, real_images, real_wv, fake_wv = data
+        real_first_images = real_first_images.to(self.device)
         real_images = real_images.to(self.device)
         real_wv = real_wv.to(self.device)
         fake_wv = fake_wv.to(self.device)
-        data = real_images, real_wv, fake_wv
+        data = real_first_images, real_images, real_wv, fake_wv
 
         ## Forward G
         real_wv_flat = real_wv.view(self.batch_size, -1)
@@ -613,7 +621,7 @@ class GANModel(BaseModel):
         # refined2 = self.forward(self.G_refiner, refined1)
 
         ## Make input pairs
-        rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined1)
+        rr_first_pair, rr_pair, rf_pair, fr_pair, fr_refined_pair = self.set_inputs(data, fake_images, refined1)
 
         if phase == 'train':
 
@@ -622,7 +630,7 @@ class GANModel(BaseModel):
             # all_true = np.all([param.requires_grad for param in self.D.parameters()])
             # print("All D parameters have grad:", str(all_true))
             self.D_optimizer.zero_grad()
-            self.backward_D(rr_pair, rf_pair, fr_pair, update=train_D, prob_flip_labels=self.prob_flip_labels)
+            self.backward_D(rr_first_pair, rf_pair, fr_pair, update=train_D, prob_flip_labels=self.prob_flip_labels)
             if train_D:
                 self.D_optimizer.step()
 
@@ -630,7 +638,7 @@ class GANModel(BaseModel):
             self.D = self.set_requires_grad(self.D, False)      # Disable backprop for D
             self.G = self.set_requires_grad(self.G, train_G)
             self.G_optimizer.zero_grad()
-            self.backward_G(fr_pair, real_images, update=train_G, prob_flip_labels=self.prob_flip_labels)
+            self.backward_G(fr_pair, real_first_images, update=train_G, prob_flip_labels=self.prob_flip_labels)
             if train_G:
                 self.G_optimizer.step()
 
@@ -649,10 +657,9 @@ class GANModel(BaseModel):
             if train_G:
                 self.G_refiner_optimizer.step()
 
-
         else:
-            self.backward_D(rr_pair, rf_pair, fr_pair, update=False, prob_flip_labels=0.0)
-            self.backward_G(fr_pair, real_images, update=False, prob_flip_labels=0.0)
+            self.backward_D(rr_first_pair, rf_pair, fr_pair, update=False, prob_flip_labels=0.0)
+            self.backward_G(fr_pair, real_first_images, update=False, prob_flip_labels=0.0)
             self.backward_D_decider(rr_pair, fr_refined_pair, update=False, prob_flip_labels=0.0)
             self.backward_G_refiner(fr_refined_pair, real_images, update=False, prob_flip_labels=0.0)
 

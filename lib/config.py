@@ -17,29 +17,31 @@ class Config():
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_decider_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_decider_fr_acc'
 
         ## Shapes
-        self.SENTENCE_LENGTH = 4
+        self.SENTENCE_LENGTH = 5
         self.NOISE_LENGTH = 1
         self.WV_SIZE = 64        ## Should be same as in data/config.py
-        self.IMAGE_WIDTH = 64
-        self.IMAGE_HEIGHT = 64
+        self.IMAGE_WIDTH_FIRST = 64
+        self.IMAGE_HEIGHT_FIRST = 64
+        self.IMAGE_WIDTH = 128
+        self.IMAGE_HEIGHT = 128
         self.N_CHANNELS = 3
 
         ## Stats (Change w.r.t stats file under data/)
         self.NORMALIZE = True
-        # self.MEAN = [0.5, 0.5, 0.5]
-        # self.STD = [0.5, 0.5, 0.5]
+        self.MEAN = [0.5, 0.5, 0.5]
+        self.STD = [0.5, 0.5, 0.5]
         # self.MEAN = [0.5505, 0.3927, 0.4473]
         # self.STD = [0.2245, 0.2782, 0.3102]
-        self.MEAN = [0.485, 0.456, 0.406]
-        self.STD = [0.229, 0.224, 0.225]
+        # self.MEAN = [0.485, 0.456, 0.406]
+        # self.STD = [0.229, 0.224, 0.225]
 
         ## Batch sampler
-        self.SHUFFLE_GROUPS = True
-        self.GROUP_N_LABELS_RANGES = [-1, 5, 1000]
+        # self.SHUFFLE_GROUPS = True
+        # self.GROUP_N_LABELS_RANGES = [-1, 5, 1000]
         # self.GROUP_N_LABELS_RANGES = [0, 10000]
-        self.GROUP_WIDTH_RANGES = [-1, 500, 100000]
+        # self.GROUP_WIDTH_RANGES = [-1, 500, 100000]
         # self.GROUP_WIDTH_RANGES = [-1, 100000]
-        self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
+        # self.GROUP_HEIGHT_RANGES = [-1, 590, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
@@ -55,9 +57,10 @@ class Config():
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
         self.WORD_VECTORS_SIMILAR_PAD = True
-        self.WORD_VECTORS_SIMILAR_PAD_TOPN = 2
-        self.WORD_VECTORS_SIMILAR_TAKE_SELF = True
+        self.WORD_VECTORS_SIMILAR_PAD_TOPN = 10
+        self.WORD_VECTORS_SIMILAR_TAKE_SELF = False
         self.WORD_VECTORS_DISSIMILAR_TOPN = 10
+        self.MIN_WV_SIMILARITY_PROB = 0.50
 
         ## GAN options
         self.N_INPUT = (self.SENTENCE_LENGTH + self.NOISE_LENGTH) * self.WV_SIZE
@@ -114,5 +117,5 @@ class Config():
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
-        self.FONT_SIZE = 7
+        self.FONT_SIZE = 9
         self.WORDS2IMAGE_N_COLUMN = 2
