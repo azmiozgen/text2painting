@@ -179,7 +179,7 @@ class AlignCollate(object):
         ## 'first' for smaller image resizing for levels of GAN (first level 64x64 second level is 128x128)
         if self._mode == 'train':
 
-            image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
+            # image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
             ## Pad or crop_lr image with low prob.
             if np.random.rand() < 0.005:

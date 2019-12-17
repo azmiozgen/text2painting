@@ -22,7 +22,7 @@ class Config():
         self.MAX_ASPECT_RATIO = 2.0
 
         ## Word2Vec
-        self.WV_MIN_COUNT = 1       ## Ignores all words with total frequency lower than this.
+        self.WV_MIN_COUNT = 2       ## Ignores all words with total frequency lower than this.
         self.WV_WINDOW = 10         ## Maximum distance between the current and predicted word within a sentence.
         self.WV_SIZE = 64           ## Dimensionality of the word vectors.
         self.WV_SAMPLE = 1e-4       ## The threshold for configuring which higher-frequency words are randomly downsampled. EFFECTIVE!
