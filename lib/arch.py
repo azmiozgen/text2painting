@@ -301,13 +301,13 @@ class DiscriminatorStack(nn.Module):
                 spectral_norm(nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False)),     ## ndf * 2 x H/4 x W/4
                 nn.BatchNorm2d(ndf * 2),
                 nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 4 x H/8 x W/8
+                spectral_norm(nn.Conv2d(ndf * 2, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 4 x H/8 x W/8
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)), ## ndf * 8 x H/16 x W/16
-                nn.BatchNorm2d(ndf * 8),
-                nn.LeakyReLU(0.2, inplace=True),
-                spectral_norm(nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## ndf * 8 x H/32 x W/32
+                spectral_norm(nn.Conv2d(ndf * 4, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## ndf * 8 x H/32 x W/32
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
@@ -320,13 +320,13 @@ class DiscriminatorStack(nn.Module):
                 nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False),     ## ndf * 2 x H/4 x W/4
                 nn.BatchNorm2d(ndf * 2),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+                nn.Conv2d(ndf * 2, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
-                nn.BatchNorm2d(ndf * 8),
-                nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 8, out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+                nn.Conv2d(ndf * 4, out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
                 # nn.BatchNorm2d(ndf * 8),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
