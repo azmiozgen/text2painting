@@ -121,5 +121,5 @@ class Config():
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
-        self.FONT_SIZE = 12
+        self.FONT_SIZE = 16
         self.WORDS2IMAGE_N_COLUMN = 2
