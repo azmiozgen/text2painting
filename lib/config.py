@@ -17,13 +17,15 @@ class Config():
         self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_decider_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_decider_fr_acc'
 
         ## Shapes
-        self.SENTENCE_LENGTH = 5
+        self.SENTENCE_LENGTH = 7
         self.NOISE_LENGTH = 1
         self.WV_SIZE = 64        ## Should be same as in data/config.py
         self.IMAGE_WIDTH_FIRST = 64
         self.IMAGE_HEIGHT_FIRST = 64
-        self.IMAGE_WIDTH = 128
-        self.IMAGE_HEIGHT = 128
+        self.IMAGE_WIDTH_SECOND = 128
+        self.IMAGE_HEIGHT_SECOND = 128
+        self.IMAGE_WIDTH = 256
+        self.IMAGE_HEIGHT = 256
         self.N_CHANNELS = 3
 
         ## Stats (Change w.r.t stats file under data/)
@@ -90,6 +92,8 @@ class Config():
         self.D_LR = 2e-4
         self.G_REFINER_LR = 1e-4
         self.D_DECIDER_LR = 2e-4
+        self.G_REFINER2_LR = 1e-4
+        self.D_DECIDER2_LR = 2e-4
         self.LR_DROP_FACTOR = 0.5
         self.LR_DROP_PATIENCE = self.N_EPOCHS // 10
         self.LR_MIN_VAL = 1e-6
@@ -113,9 +117,9 @@ class Config():
         self.N_LOG_BATCH = 50
         self.N_SAVE_VISUALS_BATCH = 50
         self.N_SAVE_MODEL_EPOCHS = 10
-        self.N_GRID_ROW = 8
+        self.N_GRID_ROW = 10
 
         ## Misc
         self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
-        self.FONT_SIZE = 9
+        self.FONT_SIZE = 12
         self.WORDS2IMAGE_N_COLUMN = 2

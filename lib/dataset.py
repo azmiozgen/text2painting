@@ -126,6 +126,8 @@ class AlignCollate(object):
         self.std = config.STD
         self.image_width_first = config.IMAGE_WIDTH_FIRST
         self.image_height_first = config.IMAGE_HEIGHT_FIRST
+        self.image_width_second = config.IMAGE_WIDTH_SECOND
+        self.image_height_second = config.IMAGE_HEIGHT_SECOND
         self.image_width = config.IMAGE_WIDTH
         self.image_height = config.IMAGE_HEIGHT
         self.horizontal_flipping = config.HORIZONTAL_FLIPPING
@@ -172,11 +174,14 @@ class AlignCollate(object):
                 self.grayscaler = ImageUtilities.image_random_grayscaler(p=0.5)
 
         self.resizer_first = ImageUtilities.image_resizer(self.image_height_first, self.image_width_first)
+        self.resizer_second = ImageUtilities.image_resizer(self.image_height_second, self.image_width_second)
         self.resizer = ImageUtilities.image_resizer(self.image_height, self.image_width)
         self.normalizer = ImageUtilities.image_normalizer(self.mean, self.std)
 
-    def __preprocess(self, image, first):
-        ## 'first' for smaller image resizing for levels of GAN (first level 64x64 second level is 128x128)
+    def __preprocess(self, image, stage):
+        assert stage in [1, 2, 3], 'Wrong stage number {}. Choose among [1, 2, 3]'.format(stage)
+        ## 'stage' for smaller image resizing for levels of GAN (first stage 64x64, second stage is 128x128, third stage is 256x256)
+
         if self._mode == 'train':
 
             # image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
@@ -213,9 +218,11 @@ class AlignCollate(object):
             if self.random_grayscale:
                 image = self.grayscaler(image)
 
-        if first:
+        if stage == 1:
             image = self.resizer_first(image)
-        else:
+        elif stage == 2:
+            image = self.resizer_second(image)
+        elif stage == 3:
             image = self.resizer(image)
 
         if self.normalize:
@@ -330,14 +337,16 @@ class AlignCollate(object):
 
     def __call__(self, batch):
         images_first = []
+        images_second = []
         images = []
         word_vectors_list = []
         fake_word_vectors_list = []
         for item in batch:
             img = item[0]
             word_vectors = item[1]
-            images_first.append(self.__preprocess(img, first=True))
-            images.append(self.__preprocess(img, first=False))
+            images_first.append(self.__preprocess(img, stage=1))
+            images_second.append(self.__preprocess(img, stage=2))
+            images.append(self.__preprocess(img, stage=3))
 
             ## Clean wvs that are not in vocab
             word_vectors = self._clean_wvs(word_vectors)
@@ -366,11 +375,12 @@ class AlignCollate(object):
             fake_word_vectors_list.append(fake_word_vectors)
 
         images_first_tensor = torch.stack(images_first)
+        images_second_tensor = torch.stack(images_second)
         images_tensor = torch.stack(images)
         word_vectors_tensor = torch.stack(word_vectors_list)
         fake_word_vectors_tensor = torch.stack(fake_word_vectors_list)
 
-        return images_first_tensor, images_tensor, word_vectors_tensor, fake_word_vectors_tensor
+        return images_first_tensor, images_second_tensor, images_tensor, word_vectors_tensor, fake_word_vectors_tensor
 
 
 class ImageBatchSamplerAlt(Sampler):

@@ -192,7 +192,6 @@ class GeneratorRefinerUNet(nn.Module):
         super(GeneratorRefinerUNet, self).__init__()
 
         n_channels = config.N_CHANNELS
-        n_input = config.N_INPUT
         ngf = config.NG_REF_F
         self.norm_layer = config.NORM_LAYER
         self.use_spectral = config.USE_SPECTRAL_NORM
