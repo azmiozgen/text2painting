@@ -227,6 +227,50 @@ class GeneratorRefinerUNet(nn.Module):
 
         return self.final(u3)
 
+class GeneratorRefinerUNet2(nn.Module):
+    def __init__(self, config):
+        super(GeneratorRefinerUNet2, self).__init__()
+
+        n_channels = config.N_CHANNELS
+        ngf = config.NG_REF_F
+        self.norm_layer = config.NORM_LAYER
+        self.use_spectral = config.USE_SPECTRAL_NORM
+        dropout = config.G_DROPOUT
+
+        self.down1 = UNetDown(n_channels, ngf, normalize=False, use_spectral=self.use_spectral)
+        self.down2 = UNetDown(ngf, ngf * 2, use_spectral=self.use_spectral)
+        self.down3 = UNetDown(ngf * 2, ngf * 4, use_spectral=self.use_spectral)
+        self.down4 = UNetDown(ngf * 4, ngf * 8, dropout=dropout, use_spectral=self.use_spectral)
+        self.down5 = UNetDown(ngf * 8, ngf * 8, dropout=dropout, use_spectral=self.use_spectral)
+
+        self.up1 = UNetUp(ngf * 8, ngf * 8, dropout=dropout)
+        self.up2 = UNetUp(ngf * 8 + ngf * 8, ngf * 4, dropout=dropout)
+        self.up3 = UNetUp(ngf * 4 + ngf * 4, ngf * 2, dropout=dropout)
+        self.up4 = UNetUp(ngf * 2 + ngf * 2, ngf * 2, dropout=dropout)
+
+        self.final = nn.Sequential(
+            nn.Upsample(scale_factor=2),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(ngf * 2 + ngf, ngf, 4, padding=1),
+            nn.Upsample(scale_factor=2),
+            nn.ZeroPad2d((1, 0, 1, 0)),
+            nn.Conv2d(ngf, n_channels, 4, padding=1),
+            nn.Tanh(),
+        )
+
+    def forward(self, x):
+        d1 = self.down1(x)
+        d2 = self.down2(d1)
+        d3 = self.down3(d2)
+        d4 = self.down4(d3)
+        d5 = self.down5(d4)
+        u1 = self.up1(d5, d4)
+        u2 = self.up2(u1, d3)
+        u3 = self.up3(u2, d2)
+        u4 = self.up4(u3, d1)
+
+        return self.final(u4)
+
 class DiscriminatorStack(nn.Module):
     def __init__(self, config):
         super(DiscriminatorStack, self).__init__()
@@ -357,6 +401,75 @@ class DiscriminatorDecider(nn.Module):
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
+                nn.Dropout2d(dropout)
+            ]
+
+        self.conv = nn.Sequential(*self.conv)
+
+        if self.minibatch_discrimination:
+            self.mbd = MiniBatchDiscrimination(self.out_channels * 2 * 2, self.out_channels, self.ndf, batch_size)
+
+    def forward(self, image):
+        out = self.conv(image)
+        if self.minibatch_discrimination:
+            out = out.view(-1, self.out_channels * 2 * 2)
+            out = torch.cat((out, self.mbd(out)), dim=1)
+        return out
+
+class DiscriminatorDecider2(nn.Module):
+    def __init__(self, config):
+        super(DiscriminatorDecider2, self).__init__()
+        ndf = config.ND_DEC_F
+        self.ndf = ndf
+        n_channels = config.N_CHANNELS
+        self.out_channels = config.OUT_CHANNELS
+        use_spectral = config.USE_SPECTRAL_NORM
+        dropout = config.D_DROPOUT
+        self.minibatch_discrimination = config.MINIBATCH_DISCRIMINATION
+        batch_size = config.BATCH_SIZE
+
+        if use_spectral:
+            self.conv = [                                                       ## 3 x H x W
+                spectral_norm(nn.Conv2d(n_channels, ndf, kernel_size=4, stride=2, padding=1, bias=False)),   ## ndf x H/2 x W/2
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False)),      ## ndf * 2 x H/4 x W/4
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ndf * 2, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False)),  ## ndf * 4 x H/8 x W/8
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False)),  ## ndf * 4 x H/16 x W/16
+                nn.BatchNorm2d(ndf * 4),
+                nn.LeakyReLU(0.2, inplace=True),
+                spectral_norm(nn.Conv2d(ndf * 4, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False)),  ## ndf * 8 x H/32 x W/32
+                nn.BatchNorm2d(ndf * 4),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ndf * 8 x H/64 x W/64
+                nn.BatchNorm2d(ndf * 8),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/128 x W/128
+                nn.Dropout2d(dropout)
+            ]
+        else:
+            self.conv = [                                                       ## 3 x H x W
+                nn.Conv2d(n_channel, ndf, kernel_size=4, stride=2, padding=1, bias=False),           ## ndf x H/2 x W/2
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False),     ## ndf * 2 x H/4 x W/4
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 2, ndf * 2, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 4 x H/8 x W/8
+                nn.BatchNorm2d(ndf * 2),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 2, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False), ## ndf * 8 x H/16 x W/16
+                nn.BatchNorm2d(ndf * 4),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 4, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
+                nn.BatchNorm2d(ndf * 4),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/64 x W/64
+                nn.BatchNorm2d(ndf * 8),
+                nn.LeakyReLU(0.2, inplace=True),
+                nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/128 x W/128
                 nn.Dropout2d(dropout)
             ]
 

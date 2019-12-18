@@ -9,9 +9,9 @@ import torch
 import torchvision
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefiner, DiscriminatorDecider, GeneratorRefinerUNet
+from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
 from .utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
-                    get_uuid, words2image, ImageUtilities, register_hooks)
+                    get_uuid, words2image, ImageUtilities)
 
 class BaseModel(ABC):
 
@@ -124,13 +124,13 @@ class GANModel(BaseModel):
         ## Init G
         self.G = GeneratorResNet(config).to(self.device)
         self.G_refiner = GeneratorRefinerUNet(config).to(self.device)
-        self.G_refiner2 = GeneratorRefinerUNet(config).to(self.device)
+        self.G_refiner2 = GeneratorRefinerUNet2(config).to(self.device)
 
         ## Init D, optimizers, schedulers
         if mode == 'train':
             self.D = DiscriminatorStack(config).to(self.device)
             self.D_decider = DiscriminatorDecider(config).to(self.device)
-            self.D_decider2 = DiscriminatorDecider(config).to(self.device)
+            self.D_decider2 = DiscriminatorDecider2(config).to(self.device)
 
             self.G_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=True).to(self.device)
