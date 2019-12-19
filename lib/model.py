@@ -337,30 +337,30 @@ class GANModel(BaseModel):
         state = torch.load(model_file)
         self.G.load_state_dict(state['g'])
         self.G_refiner.load_state_dict(state['g_refiner'])
-        self.G_refiner.load_state_dict(state['g_refiner2'])
+        self.G_refiner2.load_state_dict(state['g_refiner2'])
         if self.mode == 'train':
             self.D.load_state_dict(state['d'])
             self.D_decider.load_state_dict(state['d_decider'])
-            self.D_decider.load_state_dict(state['d_decider2'])
+            self.D_decider2.load_state_dict(state['d_decider2'])
             self.G_optimizer.load_state_dict(state['g_optim'])
             self.D_optimizer.load_state_dict(state['d_optim'])
             self.G_refiner_optimizer.load_state_dict(state['g_refiner_optim'])
-            self.G_refiner_optimizer.load_state_dict(state['g_refiner2_optim'])
+            self.G_refiner2_optimizer.load_state_dict(state['g_refiner2_optim'])
             self.D_decider_optimizer.load_state_dict(state['d_decider_optim'])
-            self.D_decider_optimizer.load_state_dict(state['d_decider2_optim'])
+            self.D_decider2_optimizer.load_state_dict(state['d_decider2_optim'])
             self.G_lr_scheduler.load_state_dict(state['g_lr_scheduler'])
             self.D_lr_scheduler.load_state_dict(state['d_lr_scheduler'])
             self.G_refiner_lr_scheduler.load_state_dict(state['g_refiner_lr_scheduler'])
             self.D_decider_lr_scheduler.load_state_dict(state['d_decider_lr_scheduler'])
-            self.G_refiner_lr_scheduler.load_state_dict(state['g_refiner2_lr_scheduler'])
-            self.D_decider_lr_scheduler.load_state_dict(state['d_decider2_lr_scheduler'])
+            self.G_refiner2_lr_scheduler.load_state_dict(state['g_refiner2_lr_scheduler'])
+            self.D_decider2_lr_scheduler.load_state_dict(state['d_decider2_lr_scheduler'])
         if self.reset_lr:
             self.G_optimizer.param_groups[0]['lr'] = self.config.G_LR
             self.D_optimizer.param_groups[0]['lr'] = self.config.D_LR
             self.G_refiner_optimizer.param_groups[0]['lr'] = self.config.G_REFINER_LR
             self.D_decider_optimizer.param_groups[0]['lr'] = self.config.D_DECIDER_LR
-            self.G_refiner2_optimizer.param_groups[0]['lr'] = self.config.G_REFINER_LR
-            self.D_decider2_optimizer.param_groups[0]['lr'] = self.config.D_DECIDER_LR
+            self.G_refiner2_optimizer.param_groups[0]['lr'] = self.config.G_REFINER2_LR
+            self.D_decider2_optimizer.param_groups[0]['lr'] = self.config.D_DECIDER2_LR
         self.set_state_dict()
 
     def set_state_dict(self):
