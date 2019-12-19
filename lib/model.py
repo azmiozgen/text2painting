@@ -426,22 +426,22 @@ class GANModel(BaseModel):
         phase, epoch, iteration, loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_g_refiner2, loss_d_decider2,\
             acc_rr, acc_rf, acc_fr, acc_decider_rr, acc_decider_fr, acc_decider2_rr, acc_decider2_fr = log_tuple
         log_file = self.train_log_file if phase == 'train' else self.val_log_file
-        log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(
-                                                                                                                   epoch,
-                                                                                                                   iteration,
-                                                                                                                   loss_g,
-                                                                                                                   loss_d,
-                                                                                                                   loss_g_refiner,
-                                                                                                                   loss_d_decider,
-                                                                                                                   loss_g_refiner2,
-                                                                                                                   loss_d_decider2,
-                                                                                                                   acc_rr,
-                                                                                                                   acc_rf,
-                                                                                                                   acc_fr,
-                                                                                                                   acc_decider_rr,
-                                                                                                                   acc_decider_fr,
-                                                                                                                   acc_decider2_rr,
-                                                                                                                   acc_decider2_fr)
+        log_row_str = '{},{},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f},{:.4f}\n'.format(
+                                                                                                                                 epoch,
+                                                                                                                                 iteration,
+                                                                                                                                 loss_g,
+                                                                                                                                 loss_d,
+                                                                                                                                 loss_g_refiner,
+                                                                                                                                 loss_d_decider,
+                                                                                                                                 loss_g_refiner2,
+                                                                                                                                 loss_d_decider2,
+                                                                                                                                 acc_rr,
+                                                                                                                                 acc_rf,
+                                                                                                                                 acc_fr,
+                                                                                                                                 acc_decider_rr,
+                                                                                                                                 acc_decider_fr,
+                                                                                                                                 acc_decider2_rr,
+                                                                                                                                 acc_decider2_fr)
         with open(log_file, 'a') as f:
             f.write(log_row_str)
 
@@ -639,9 +639,9 @@ class GANModel(BaseModel):
 
         images_bag = []
         for real_wv, fake_image, _refined1, _refined2, real_image in zip(real_wvs, fake_images, refined1, refined2, real_images):
-            words = []
 
             ## Get words from word vectors
+            words = []
             for _real_wv in real_wv:
                 _real_wv = np.array(_real_wv)
                 word, prob = word2vec_model.wv.similar_by_vector(_real_wv)[0]

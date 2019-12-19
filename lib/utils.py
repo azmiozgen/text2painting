@@ -220,24 +220,24 @@ def words2image(text_list, config):
     
     if n_column == 1:
         
-        x0 = int(w * 0.001)
-        y0 = int(h * 0.001)
+        x0 = int(w * 0.01)
+        y0 = int(h * 0.01)
         word_height = h // len(text_list)
         for i, text in enumerate(text_list):
             y = i * word_height + y0
             x = x0
-            draw.text((x, y), text, 0, font=font)
+            draw.text((x, y), text, fill=0, font=font)
 
     elif n_column == 2:
         
         x1 = int(w * 0.01)
-        x2 = int(w * 0.51)
+        x2 = int(w * 0.55)
         y0 = int(h * 0.01)
         word_height = h // len(text_list) * 2
         for i, text in enumerate(text_list):
             y = (i // 2) * word_height + y0 if i % 2 == 0 else (i - 1) // 2 * word_height + y0
             x = x1 if i % 2 == 0 else x2
-            draw.text((x, y), text, 0, font=font)
+            draw.text((x, y), text, fill=0, font=font)
             
     else:
         print("'words2image': Column {} not implemented".format(n_column))

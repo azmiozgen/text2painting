@@ -14,10 +14,11 @@ class Config():
         self.WORD2VEC_MODEL_DIR = os.path.join(self.MODEL_DIR, 'word2vec')
         self.WORD2VEC_MODEL_FILE = os.path.join(self.WORD2VEC_MODEL_DIR, SUBSET + '_word2vec.model')
         self.MODEL_NAME = SUBSET
-        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_decider_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_decider_fr_acc'
+        self.LOG_HEADER = 'Epoch,Iteration,G_loss,D_loss,G_refiner_loss,D_decider_loss,\
+G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_decider_fr_acc,D_decider2_rr_acc,D_decider2_fr_acc'
 
         ## Shapes
-        self.SENTENCE_LENGTH = 7
+        self.SENTENCE_LENGTH = 6
         self.NOISE_LENGTH = 1
         self.WV_SIZE = 64        ## Should be same as in data/config.py
         self.IMAGE_WIDTH_FIRST = 64
@@ -120,6 +121,6 @@ class Config():
         self.N_GRID_ROW = 10
 
         ## Misc
-        self.FONTS = ['Lato-Medium.ttf', 'FreeMono.ttf', 'LiberationMono-Regular.ttf']
-        self.FONT_SIZE = 16
-        self.WORDS2IMAGE_N_COLUMN = 2
+        self.FONTS = ['Lato-Bold.ttf', 'FreeMonoBold.ttf', 'LiberationMono-Bold.ttf']
+        self.FONT_SIZE = 30
+        self.WORDS2IMAGE_N_COLUMN = 1
