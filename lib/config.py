@@ -97,7 +97,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.D_DECIDER2_LR = 2e-4
         self.LR_DROP_FACTOR = 0.5
         self.LR_DROP_PATIENCE = self.N_EPOCHS // 10
-        self.LR_MIN_VAL = 1e-6
+        self.LR_MIN_VAL = 1e-5
         self.BETA = 0.5
         self.WEIGHT_DECAY = 0.0
         self.WEIGHT_INIT = 'kaiming'  ## One of 'normal', 'xavier', 'kaiming', 'orthogonal'
