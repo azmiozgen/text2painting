@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=100.0, D_yticks=2.0, n_row=3, n_col=4):
+def plot(df, output_file, mode='train', figsize=(15, 10), G_yticks=10.0, D_yticks=4.0, n_row=3, n_col=4):
     assert mode in ['train', 'val'], "{} not available. Choose one of ['train', 'val']".format(mode)
 
     ## Drop duplicates by 'Iteration' column

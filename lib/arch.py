@@ -197,24 +197,24 @@ class GeneratorRefinerUNet(nn.Module):
         self.use_spectral = config.USE_SPECTRAL_NORM
         dropout = config.G_DROPOUT
 
-        self.down1 = UNetDown(n_channels, ngf, normalize=False, use_spectral=self.use_spectral)
-        self.down2 = UNetDown(ngf, ngf * 2, use_spectral=self.use_spectral)
-        self.down3 = UNetDown(ngf * 2, ngf * 4, use_spectral=self.use_spectral)
-        self.down4 = UNetDown(ngf * 4, ngf * 8, dropout=dropout, use_spectral=self.use_spectral)
+        self.down1 = UNetDown(n_channels, ngf * 2, normalize=False, use_spectral=self.use_spectral)
+        self.down2 = UNetDown(ngf * 2, ngf * 4, use_spectral=self.use_spectral)
+        self.down3 = UNetDown(ngf * 4, ngf * 8, use_spectral=self.use_spectral)
+        self.down4 = UNetDown(ngf * 8, ngf * 8, dropout=dropout, use_spectral=self.use_spectral)
 
         self.up1 = UNetUp(ngf * 8, ngf * 8, dropout=dropout)
-        self.up2 = UNetUp(ngf * 8 + ngf * 4, ngf * 4, dropout=dropout)
-        self.up3 = UNetUp(ngf * 4 + ngf * 2, ngf * 2, dropout=dropout)
+        self.up2 = UNetUp(ngf * 8 + ngf * 8, ngf * 4, dropout=dropout)
+        self.up3 = UNetUp(ngf * 4 + ngf * 4, ngf * 4, dropout=dropout)
 
         self.final = nn.Sequential(
-            nn.Upsample(scale_factor=2),
-            nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(ngf * 2 + ngf, ngf, 4, padding=1),
-            nn.Upsample(scale_factor=2),
-            nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(ngf, n_channels, 4, padding=1),
-            nn.Tanh(),
-        )
+                                  nn.Upsample(scale_factor=2),
+                                  nn.ZeroPad2d((1, 0, 1, 0)),
+                                  nn.Conv2d(ngf * 4 + ngf * 2, ngf * 2, 4, padding=1),
+                                  nn.Upsample(scale_factor=2),
+                                  nn.ZeroPad2d((1, 0, 1, 0)),
+                                  nn.Conv2d(ngf * 2, n_channels, 4, padding=1),
+                                  nn.Tanh()
+                                  )
 
     def forward(self, x):
         d1 = self.down1(x)

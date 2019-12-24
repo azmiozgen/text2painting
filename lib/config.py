@@ -51,11 +51,11 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         ## Augmentation options
         self.HORIZONTAL_FLIPPING = False     ## BAD!
         self.RANDOM_ROTATION = False
-        self.COLOR_JITTERING = True
-        self.RANDOM_CHANNEL_SWAPPING = True
-        self.RANDOM_GAMMA = True
+        self.COLOR_JITTERING = False
+        self.RANDOM_CHANNEL_SWAPPING = False
+        self.RANDOM_GAMMA = False
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = True
+        self.RANDOM_RESOLUTION = False
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
@@ -77,7 +77,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
         self.G_DROPOUT = 0.1
-        self.D_DROPOUT = 0.7
+        self.D_DROPOUT = 0.8
         self.USE_SPECTRAL_NORM = True
         self.MINIBATCH_DISCRIMINATION = True
         self.N_BLOCKS = 9
@@ -99,7 +99,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.LR_DROP_PATIENCE = self.N_EPOCHS // 10
         self.LR_MIN_VAL = 1e-5
         self.BETA = 0.5
-        self.WEIGHT_DECAY = 0.0
+        self.WEIGHT_DECAY = 1e-5
         self.WEIGHT_INIT = 'kaiming'  ## One of 'normal', 'xavier', 'kaiming', 'orthogonal'
         self.INIT_GAIN = 0.02
 
