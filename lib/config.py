@@ -49,11 +49,12 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         # self.GROUP_HEIGHT_RANGES = [-1, 100000]
 
         ## Augmentation options
+        self.RANDOM_BLURRINESS = True
         self.HORIZONTAL_FLIPPING = False     ## BAD!
         self.RANDOM_ROTATION = False
         self.COLOR_JITTERING = False
         self.RANDOM_CHANNEL_SWAPPING = False
-        self.RANDOM_GAMMA = False
+        self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = False
 
