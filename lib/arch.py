@@ -381,7 +381,7 @@ class DiscriminatorDecider(nn.Module):
                 spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)),  ## ndf * 8 x H/32 x W/32
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
+                spectral_norm(nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## 1 x H/64 x W/64
                 nn.Dropout2d(dropout)
             ]
         else:
@@ -444,10 +444,10 @@ class DiscriminatorDecider2(nn.Module):
                 spectral_norm(nn.Conv2d(ndf * 4, ndf * 4, kernel_size=4, stride=2, padding=1, bias=False)),  ## ndf * 8 x H/32 x W/32
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False),                 ## ndf * 8 x H/64 x W/64
+                spectral_norm(nn.Conv2d(ndf * 4, ndf * 8, kernel_size=4, stride=2, padding=1, bias=False)),                 ## ndf * 8 x H/64 x W/64
                 nn.BatchNorm2d(ndf * 8),
                 nn.LeakyReLU(0.2, inplace=True),
-                nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/128 x W/128
+                spectral_norm(nn.Conv2d(ndf * 8, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## 1 x H/128 x W/128
                 nn.Dropout2d(dropout)
             ]
         else:
