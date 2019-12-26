@@ -6,11 +6,11 @@
 
 Current results (input words - stage1 output - stage2 output - stage3 output - ground truth)
 
-![strong_man](./assets/strong_man.png "strong_man")
-![horse](./assets/horse.png "horse")
-![horses_riders](./assets/horses_riders.png "horses_riders")
-![swap](./assets/swap.png "swap")
-![scenery](./assets/scenery.png "scenery")
+![strong_man](./assets/strong_man.jpg "strong_man")
+![horse](./assets/horse.jpg "horse")
+![horses_riders](./assets/horses_riders.jpg "horses_riders")
+![swap](./assets/swap.jpg "swap")
+![scenery](./assets/scenery.jpg "scenery")
 
 ## Model
 
