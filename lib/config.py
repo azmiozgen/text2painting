@@ -89,7 +89,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
 
         ## Hyper-params
         self.BATCH_SIZE = 16
-        self.N_EPOCHS = 1000
+        self.N_EPOCHS = 500
         self.G_LR = 1e-4
         self.D_LR = 2e-4
         self.G_REFINER_LR = 1e-4

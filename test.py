@@ -15,21 +15,22 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from lib.config import Config
-from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
-from lib.model import GANModel
-
-
-CONFIG = Config()
-
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, help='Model file to load')
+    parser.add_argument('--model', type=str, required=True, help='Model file to load')
     args = parser.parse_args()
     model_file = args.model
+
+    ## Import model from relevant lib 
+    model_dir = os.path.dirname(os.path.abspath(model_file))
+    model_lib_dir = os.path.join(model_dir, 'lib')
+    sys.path.append(model_lib_dir)
+    from model import GANModel
+    from lib.config import Config
+    from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
+
+    CONFIG = Config()
 
     ## Data loaders
     print("Data loader initializing..")
@@ -152,9 +153,9 @@ if __name__ == "__main__":
 
         ## Save visual outputs
         try:
-            output_filename = "{}_{:08}.png".format(model.output_dir, iteration)
+            output_filename = "{}_{:08}.png".format(model.model_name, iteration)
             grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, val_dataset.word2vec_model)
-            model.save_img_output(grid_img_pil, output_filename)
+            model.save_img_test_output(grid_img_pil, output_filename)
         except Exception as e:
             print('Grid image generation failed.', e, 'Passing.')
 

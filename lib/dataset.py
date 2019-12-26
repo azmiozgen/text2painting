@@ -15,8 +15,13 @@ from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 from torchvision.transforms.functional import normalize, to_tensor
 
-from .preprocess import crop_edges_lr, pad_image
-from .utils import ImageUtilities
+try:
+    from .preprocess import crop_edges_lr, pad_image
+    from .utils import ImageUtilities
+except ImportError:
+    from preprocess import crop_edges_lr, pad_image
+    from utils import ImageUtilities
+
 
 
 class TextArtDataLoader(Dataset):

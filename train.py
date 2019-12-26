@@ -13,14 +13,7 @@ from PIL import Image, ImageFilter
 import torch
 import torch.nn as nn
 from gensim.models import Word2Vec
-from lib.config import Config
-from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
-from lib.model import GANModel
 from torch.utils.data import DataLoader
-
-
-CONFIG = Config()
-
 
 
 if __name__ == "__main__":
@@ -31,6 +24,21 @@ if __name__ == "__main__":
     args = parser.parse_args()
     model_file = args.model
     reset_lr = args.reset_lr
+
+    ## Import model from relevant lib 
+    if model_file:
+        model_dir = os.path.dirname(os.path.abspath(model_file))
+        model_lib_dir = os.path.join(model_dir, 'lib')
+        sys.path.append(model_lib_dir)
+        # from config import Config
+        # from dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
+        from model import GANModel
+    else:
+        from lib.model import GANModel
+    from lib.config import Config
+    from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
+
+    CONFIG = Config()
 
     ## Data loaders
     print("Data loaders initializing..")

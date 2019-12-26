@@ -9,9 +9,14 @@ import torch
 import torchvision
 from torchvision.utils import make_grid
 
-from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
-from .utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
-                    get_uuid, words2image, ImageUtilities)
+try:
+    from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
+    from .utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
+                        get_uuid, words2image, ImageUtilities)
+except ImportError:
+    from arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
+    from utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
+                        get_uuid, words2image, ImageUtilities)
 
 class BaseModel(ABC):
 
@@ -692,6 +697,12 @@ class GANModel(BaseModel):
 
     def save_img_output(self, img_pil, filename):
         output_dir = os.path.join(self.model_dir, 'output')
+        os.makedirs(output_dir, exist_ok=True)
+        output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
+        img_pil.save(output_file)
+
+    def save_img_test_output(self, img_pil, filename):
+        output_dir = os.path.join(self.output_dir)
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
