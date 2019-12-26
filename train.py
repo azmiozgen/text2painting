@@ -34,12 +34,12 @@ if __name__ == "__main__":
 
     ## Data loaders
     print("Data loaders initializing..")
-    train_dataset = TextArtDataLoader(CONFIG, mode='train')
-    val_dataset = TextArtDataLoader(CONFIG, mode='val')
-    train_align_collate = AlignCollate(CONFIG, 'train')
-    val_align_collate = AlignCollate(CONFIG, 'val')
-    # train_batch_sampler = ImageBatchSampler(CONFIG, mode='train')
-    # val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
+    train_dataset = TextArtDataLoader(CONFIG, kind='train')
+    val_dataset = TextArtDataLoader(CONFIG, kind='val')
+    train_align_collate = AlignCollate(CONFIG, mode='train')
+    val_align_collate = AlignCollate(CONFIG, mode='test')
+    # train_batch_sampler = ImageBatchSampler(CONFIG, kind='train')
+    # val_batch_sampler = ImageBatchSampler(CONFIG, kind='val')
     train_loader = DataLoader(train_dataset,
                               batch_size=CONFIG.BATCH_SIZE,
                               shuffle=True,

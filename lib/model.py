@@ -17,7 +17,7 @@ class BaseModel(ABC):
 
     def __init__(self, config, model_file=None, mode='train'):
 
-        assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
+        assert mode in ['train', 'test', 'pred'], 'Mode should be one of "train, test, pred"'
         self.config = config
         self.mode = mode
         self.device = config.DEVICE
@@ -85,7 +85,7 @@ class GANModel(BaseModel):
 
     def __init__(self, config, model_file=None, mode='train', reset_lr=False):
 
-        assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
+        assert mode in ['train', 'test', 'pred'], 'Mode should be one of "train, test, pred"'
         self.config = config
         self.mode = mode
         self.reset_lr = reset_lr
@@ -127,11 +127,12 @@ class GANModel(BaseModel):
         self.G_refiner2 = GeneratorRefinerUNet2(config).to(self.device)
 
         ## Init D, optimizers, schedulers
-        if mode == 'train':
+        if self.mode in ['train', 'test']:
             self.D = DiscriminatorStack(config).to(self.device)
             self.D_decider = DiscriminatorDecider(config).to(self.device)
             self.D_decider2 = DiscriminatorDecider2(config).to(self.device)
 
+        if self.mode in ['train']:
             self.G_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=True).to(self.device)
             self.G_refiner_criterionGAN = GANLoss(self.gan_loss2, self.device, accuracy=True).to(self.device)
@@ -212,19 +213,13 @@ class GANModel(BaseModel):
         ## Parallelize over gpus
         if torch.cuda.device_count() > 1:
             self.G = torch.nn.DataParallel(self.G)
-            self.D = torch.nn.DataParallel(self.D)
             self.G_refiner = torch.nn.DataParallel(self.G_refiner)
-            self.D_decider = torch.nn.DataParallel(self.D_decider)
             self.G_refiner2 = torch.nn.DataParallel(self.G_refiner2)
-            self.D_decider2 = torch.nn.DataParallel(self.D_decider2)
+            if self.mode in ['train', 'test']:
+                self.D = torch.nn.DataParallel(self.D)
+                self.D_decider = torch.nn.DataParallel(self.D_decider)
+                self.D_decider2 = torch.nn.DataParallel(self.D_decider2)
 
-        ## Init weights
-        self.init_weights(self.G, weight_init, init_gain=init_gain)
-        self.init_weights(self.D, weight_init, init_gain=init_gain)
-        self.init_weights(self.G_refiner, weight_init, init_gain=init_gain)
-        self.init_weights(self.D_decider, weight_init, init_gain=init_gain)
-        self.init_weights(self.G_refiner2, weight_init, init_gain=init_gain)
-        self.init_weights(self.D_decider2, weight_init, init_gain=init_gain)
 
         ## Init things (these will get values later) 
         self.state_dict = {
@@ -273,40 +268,54 @@ class GANModel(BaseModel):
             self.load_state_dict(model_file)
             self.set_model_dir(model_file)
             print("{} loaded.".format(self.model_dir))
+            if self.mode == 'test':
+                self.set_output_dir(model_file)
         else:
+            ## Init weights
+            self.init_weights(self.G, weight_init, init_gain=init_gain)
+            self.init_weights(self.G_refiner, weight_init, init_gain=init_gain)
+            self.init_weights(self.G_refiner2, weight_init, init_gain=init_gain)
+            self.init_weights(self.D, weight_init, init_gain=init_gain)
+            self.init_weights(self.D_decider, weight_init, init_gain=init_gain)
+            self.init_weights(self.D_decider2, weight_init, init_gain=init_gain)
+
             self.set_state_dict()
             self.set_model_dir()
             print("{} created.".format(self.model_dir))
         time.sleep(1.0)
 
-        G_lr = self.G_optimizer.param_groups[0]['lr']
-        D_lr = self.D_optimizer.param_groups[0]['lr']
-        G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
-        D_decider_lr = self.D_decider_optimizer.param_groups[0]['lr']
-        G_refiner2_lr = self.G_refiner2_optimizer.param_groups[0]['lr']
-        D_decider2_lr = self.D_decider2_optimizer.param_groups[0]['lr']
+        if self.mode in ['train']:
+            G_lr = self.G_optimizer.param_groups[0]['lr']
+            D_lr = self.D_optimizer.param_groups[0]['lr']
+            G_refiner_lr = self.G_refiner_optimizer.param_groups[0]['lr']
+            D_decider_lr = self.D_decider_optimizer.param_groups[0]['lr']
+            G_refiner2_lr = self.G_refiner2_optimizer.param_groups[0]['lr']
+            D_decider2_lr = self.D_decider2_optimizer.param_groups[0]['lr']
 
         # print(self.G)
         # print(self.D)
         print("# parameters of G: {:2E}".format(sum(p.numel() for p in self.G.parameters())))
-        print("# parameters of D: {:2E}".format(sum(p.numel() for p in self.D.parameters())))
         print("# parameters of G refiner: {:2E}".format(sum(p.numel() for p in self.G_refiner.parameters())))
-        print("# parameters of D decider: {:2E}".format(sum(p.numel() for p in self.D_decider.parameters())))
         print("# parameters of G refiner2: {:2E}".format(sum(p.numel() for p in self.G_refiner2.parameters())))
-        print("# parameters of D decider2: {:2E}".format(sum(p.numel() for p in self.D_decider2.parameters())))
+        if self.mode in ['train', 'test']:
+            print("# parameters of D: {:2E}".format(sum(p.numel() for p in self.D.parameters())))
+            print("# parameters of D decider: {:2E}".format(sum(p.numel() for p in self.D_decider.parameters())))
+            print("# parameters of D decider2: {:2E}".format(sum(p.numel() for p in self.D_decider2.parameters())))
         print("Device:", self.device)
+
         print("Parameters:")
         print("\tBatch size:", self.batch_size)
-        print("\tGAN loss1:", self.gan_loss1)
-        print("\tGAN loss2:", self.gan_loss2)
-        # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
-        print("\tLearning rates (G, D, G_refiner, D_decider, G_refiner2, D_decider2): \
+        if self.mode in ['train']:
+            print("\tGAN loss1:", self.gan_loss1)
+            print("\tGAN loss2:", self.gan_loss2)
+            # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
+            print("\tLearning rates (G, D, G_refiner, D_decider, G_refiner2, D_decider2): \
 {:.2E}, {:.2E}, {:.2E}, {:.2E}, {:.2E}, {:.2E}".format(G_lr, D_lr, G_refiner_lr, D_decider_lr, G_refiner2_lr, D_decider2_lr))
-        print("\tDropout rates (G, D): {:.2f}, {:.2f}".format(config.G_DROPOUT, config.D_DROPOUT))
-        print("\tAdam optimizer beta:", beta)
-        print("\tWeight decay:", weight_decay)
-        print("\tWeight initialization:", weight_init)
-        print("\tGenerator lambda weight:", self.lambda_l1)
+            print("\tDropout rates (G, D): {:.2f}, {:.2f}".format(config.G_DROPOUT, config.D_DROPOUT))
+            print("\tAdam optimizer beta:", beta)
+            print("\tWeight decay:", weight_decay)
+            print("\tWeight initialization:", weight_init)
+            print("\tGenerator lambda weight:", self.lambda_l1)
 
     def init_weights(self, net, init_type, init_gain=0.02):
         def init_func(m):
@@ -338,10 +347,11 @@ class GANModel(BaseModel):
         self.G.load_state_dict(state['g'])
         self.G_refiner.load_state_dict(state['g_refiner'])
         self.G_refiner2.load_state_dict(state['g_refiner2'])
-        if self.mode == 'train':
+        if self.mode in ['train', 'test']:
             self.D.load_state_dict(state['d'])
             self.D_decider.load_state_dict(state['d_decider'])
             self.D_decider2.load_state_dict(state['d_decider2'])
+        if self.mode in ['train']:
             self.G_optimizer.load_state_dict(state['g_optim'])
             self.D_optimizer.load_state_dict(state['d_optim'])
             self.G_refiner_optimizer.load_state_dict(state['g_refiner_optim'])
@@ -367,10 +377,11 @@ class GANModel(BaseModel):
         self.state_dict['g'] = self.G.state_dict()
         self.state_dict['g_refiner'] = self.G_refiner.state_dict()
         self.state_dict['g_refiner2'] = self.G_refiner2.state_dict()
-        if self.mode == 'train':
+        if self.mode in ['train', 'test']:
             self.state_dict['d'] = self.D.state_dict()
             self.state_dict['d_decider'] = self.D_decider.state_dict()
             self.state_dict['d_decider2'] = self.D_decider2.state_dict()
+        if self.mode in ['train']:
             self.state_dict['g_optim'] = self.G_optimizer.state_dict()
             self.state_dict['d_optim'] = self.D_optimizer.state_dict()
             self.state_dict['g_refiner_optim'] = self.G_refiner_optimizer.state_dict()
@@ -394,9 +405,10 @@ class GANModel(BaseModel):
     def set_model_dir(self, model_file=None):
         if model_file:
             model_dir = os.path.join(self.config.MODEL_DIR, os.path.basename(os.path.dirname(model_file)))
+            self.model_dirname = os.path.basename(model_dir)
         else:
-            model_dirname = "{}_{}".format(self.model_name, get_uuid())
-            model_dir = os.path.join(self.config.MODEL_DIR, model_dirname)
+            self.model_dirname = "{}_{}".format(self.model_name, get_uuid())
+            model_dir = os.path.join(self.config.MODEL_DIR, self.model_dirname)
             os.makedirs(model_dir, exist_ok=True)
         self.model_dir = model_dir
 
@@ -421,6 +433,10 @@ class GANModel(BaseModel):
                 f.write(self.log_header + '\n')
             with open(val_log_file, 'w') as f:
                 f.write(self.log_header + '\n')
+
+    def set_output_dir(self):
+        self.output_dir = os.path.join(self.config.BASE_DIR, 'outputs', self.model_dirname)
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def save_logs(self, log_tuple):
         phase, epoch, iteration, loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_g_refiner2, loss_d_decider2,\

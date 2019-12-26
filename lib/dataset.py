@@ -20,10 +20,10 @@ from .utils import ImageUtilities
 
 
 class TextArtDataLoader(Dataset):
-    def __init__(self, config, mode='train'):
+    def __init__(self, config, kind='train'):
 
-        assert mode in ['train', 'val', 'test']
-        self.mode = mode
+        assert kind in ['train', 'val', 'test']
+        self.kind = kind
 
         self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
         self.load_word_vectors = config.LOAD_WORD_VECTORS
@@ -40,7 +40,7 @@ class TextArtDataLoader(Dataset):
             self.word_vectors_dict = None
 
         data_dir = config.DATA_DIR
-        label_filename = '{}_labels.csv'.format(self.mode)
+        label_filename = '{}_labels.csv'.format(self.kind)
         label_file = os.path.join(data_dir, label_filename)
 
         if not os.path.isfile(label_file):
@@ -118,7 +118,10 @@ class AlignCollate(object):
     and returns minibatch."""
 
     def __init__(self, config, mode='train'):
-                       
+
+        self.mode = mode
+        assert self.mode in ['train', 'test']
+
         self.config = config
         self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
         self.normalize = config.NORMALIZE
@@ -142,8 +145,6 @@ class AlignCollate(object):
         self.sentence_length = config.SENTENCE_LENGTH
         self.noise_length = config.NOISE_LENGTH
 
-        self._mode = mode
-        assert self._mode in ['train', 'val']
 
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
@@ -152,7 +153,7 @@ class AlignCollate(object):
         self.word_vectors_similar_take_self = config.WORD_VECTORS_SIMILAR_TAKE_SELF
         self.word_vectors_dissimilar_topN = config.WORD_VECTORS_DISSIMILAR_TOPN
 
-        if self._mode == 'train':
+        if self.mode == 'train':
             if self.random_resolution:
                 self.random_res = ImageUtilities.image_random_resolution([0.7, 1.3])
 
@@ -183,7 +184,7 @@ class AlignCollate(object):
         assert stage in [1, 2, 3], 'Wrong stage number {}. Choose among [1, 2, 3]'.format(stage)
         ## 'stage' for smaller image resizing for levels of GAN (first stage 64x64, second stage is 128x128, third stage is 256x256)
 
-        if self._mode == 'train':
+        if self.mode == 'train':
 
             if self.random_blurriness:
                 image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
@@ -390,9 +391,9 @@ class ImageBatchSamplerAlt(Sampler):
         Group image files by their groups.
     '''
 
-    def __init__(self, config, mode='train'):
+    def __init__(self, config, kind='train'):
 
-        assert mode in ['train', 'val', 'test']
+        assert kind in ['train', 'val', 'test']
 
         self.config = config
         self.batch_size = config.BATCH_SIZE
@@ -401,9 +402,9 @@ class ImageBatchSamplerAlt(Sampler):
         height_ranges = config.GROUP_HEIGHT_RANGES
 
         data_dir = config.DATA_DIR
-        labels_filename = '{}_labels.csv'.format(mode)
+        labels_filename = '{}_labels.csv'.format(kind)
         labels_file = os.path.join(data_dir, labels_filename)
-        shapes_filename = '{}_image_shapes.csv'.format(mode)
+        shapes_filename = '{}_image_shapes.csv'.format(kind)
         shapes_file = os.path.join(data_dir, shapes_filename)
 
         ## Read labels file
@@ -491,9 +492,9 @@ class ImageBatchSampler(Sampler):
         Group image files by their image sizes # of labels and sample similar from images.
     '''
 
-    def __init__(self, config, mode='train'):
+    def __init__(self, config, kind='train'):
 
-        assert mode in ['train', 'val', 'test']
+        assert kind in ['train', 'test']
 
         self.config = config
         self.batch_size = config.BATCH_SIZE
@@ -503,9 +504,9 @@ class ImageBatchSampler(Sampler):
         height_ranges = config.GROUP_HEIGHT_RANGES
 
         data_dir = config.DATA_DIR
-        labels_filename = '{}_labels.csv'.format(mode)
+        labels_filename = '{}_labels.csv'.format(kind)
         labels_file = os.path.join(data_dir, labels_filename)
-        shapes_filename = '{}_image_shapes.csv'.format(mode)
+        shapes_filename = '{}_image_shapes.csv'.format(kind)
         shapes_file = os.path.join(data_dir, shapes_filename)
 
         ## Read labels file
@@ -595,6 +596,6 @@ if __name__ == "__main__":
     DATA_DIR = 'united'
     
     ## Test TextArtDataLoader
-    train_dataset = TextArtDataLoader(DATA_DIR, CONFIG, mode='train')
+    train_dataset = TextArtDataLoader(DATA_DIR, CONFIG, kind='train')
     print("Size:", len(train_dataset))
     print(train_dataset[0])
