@@ -130,6 +130,7 @@ class AlignCollate(object):
         self.image_height_second = config.IMAGE_HEIGHT_SECOND
         self.image_width = config.IMAGE_WIDTH
         self.image_height = config.IMAGE_HEIGHT
+        self.random_blurriness = config.RANDOM_BLURRINESS
         self.horizontal_flipping = config.HORIZONTAL_FLIPPING
         self.random_rotation = config.RANDOM_ROTATION
         self.color_jittering = config.COLOR_JITTERING
@@ -184,7 +185,8 @@ class AlignCollate(object):
 
         if self._mode == 'train':
 
-            # image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
+            if self.random_blurriness:
+                image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
             ## Pad or crop_lr image with low prob.
             if np.random.rand() < 0.005:
