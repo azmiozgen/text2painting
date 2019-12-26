@@ -12,8 +12,6 @@ from config import Config
 
 if __name__ == '__main__':
 
-    # SUBSET_LIST = ['deviantart', 'wikiart']
-    #SUBSET_LIST = ['deviantart_1', 'deviantart_2', 'deviantart_3', 'deviantart_4']
     SUBSET_LIST = ['deviantart_verified', 'wikiart_verified']
     FRACTION = 1.0  ## To prepare smaller dataset, make 1.0 to take all
 
