@@ -9,14 +9,9 @@ from PIL import Image, ImageDraw, ImageFont
 from graphviz import Digraph
 from torch.autograd import Variable, Function
 
-try:
-    from .preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
-                             RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
-except ImportError:
-    from preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
-                            RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
-
-from config import Config
+from lib.preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
+                        RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
+from lib.config import Config
 
 class GANLoss(nn.Module):
 
