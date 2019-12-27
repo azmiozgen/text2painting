@@ -15,13 +15,8 @@ from torch.utils.data import Dataset
 from torch.utils.data.sampler import Sampler
 from torchvision.transforms.functional import normalize, to_tensor
 
-try:
-    from .preprocess import crop_edges_lr, pad_image
-    from .utils import ImageUtilities
-except ImportError:
-    from preprocess import crop_edges_lr, pad_image
-    from utils import ImageUtilities
-
+from lib.preprocess import crop_edges_lr, pad_image
+from lib.utils import ImageUtilities
 
 
 class TextArtDataLoader(Dataset):
@@ -194,11 +189,11 @@ class AlignCollate(object):
             if self.random_blurriness:
                 image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
 
-            ## Pad or crop_lr image with low prob.
-            if np.random.rand() < 0.005:
-                image = pad_image(image)
-            elif np.random.rand() < 0.01:
-                image = crop_edges_lr(image)
+            # ## Pad or crop_lr image with low prob.
+            # if np.random.rand() < 0.005:
+            #     image = pad_image(image)
+            # elif np.random.rand() < 0.01:
+            #     image = crop_edges_lr(image)
 
             if self.random_resolution:
                 image = self.random_res(image)

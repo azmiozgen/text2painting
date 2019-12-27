@@ -58,32 +58,11 @@ if __name__ == "__main__":
     print("\nTesting starting..")
     start = time.time()
 
-    total_loss_g = 0.0
-    total_loss_d = 0.0
-    total_loss_g_refiner = 0.0
-    total_loss_d_decider = 0.0
-    total_loss_g_refiner2 = 0.0
-    total_loss_d_decider2 = 0.0
-    total_loss_gp_fr = 0.0
-    total_loss_gp_rf = 0.0
-    total_loss_gp_decider_fr = 0.0
-    total_loss_gp_decider2_fr = 0.0
-    total_acc_rr = 0.0
-    total_acc_rf = 0.0
-    total_acc_fr = 0.0
-    total_acc_decider_rr = 0.0
-    total_acc_decider_fr = 0.0
-    total_acc_decider2_rr = 0.0
-    total_acc_decider2_fr = 0.0
-
     data_loader = val_loader
     n_batch = n_val_batch
     model.G.eval()
-    model.D.eval()
     model.G_refiner.eval()
-    model.D_decider.eval()
     model.G_refiner2.eval()
-    model.D_decider2.eval()
     train_D = False
     train_G = False
 
@@ -104,91 +83,29 @@ if __name__ == "__main__":
         ## Forward G_refiner2
         refined2 = model.forward(model.G_refiner2, refined1)
 
-        ## Update total loss
-        loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_g_refiner2, loss_d_decider2,\
-            loss_gp_fr, loss_gp_rf, loss_gp_decider_fr, loss_gp_decider2_fr = model.get_losses()
-        total_loss_g += loss_g
-        total_loss_d += loss_d
-        total_loss_g_refiner += loss_g_refiner
-        total_loss_d_decider += loss_d_decider
-        total_loss_g_refiner2 += loss_g_refiner2
-        total_loss_d_decider2 += loss_d_decider2
-        if loss_gp_fr:
-            total_loss_gp_fr += loss_gp_fr
-        if loss_gp_rf:
-            total_loss_gp_rf += loss_gp_rf
-        if loss_gp_decider_fr:
-            total_loss_gp_decider_fr += loss_gp_decider_fr
-        if loss_gp_decider2_fr:
-            total_loss_gp_decider2_fr += loss_gp_decider2_fr
 
-        ## Get D accuracy
-        acc_rr, acc_rf, acc_fr, acc_decider_rr, acc_decider_fr, acc_decider2_rr, acc_decider2_fr = model.get_D_accuracy()
-        total_acc_rr += acc_rr
-        total_acc_rf += acc_rf
-        total_acc_fr += acc_fr
-        total_acc_decider_rr += acc_decider_rr
-        total_acc_decider_fr += acc_decider_fr
-        total_acc_decider2_rr += acc_decider2_rr
-        total_acc_decider2_fr += acc_decider2_fr
+        for j, (_refined2, real_image) in enumerate(zip(refined2, real_images)):
+            _id = i * batch_size + j
 
-        # Print logs
-        if i % CONFIG.N_PRINT_BATCH == 0:
-            print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
-            if CONFIG.GAN_LOSS1 == 'wgangp':
-                print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
-                print("| G refiner loss: {:.4f} | D decider loss {:.4f}".format(loss_g_refiner, loss_d_decider), end=' ')
-                print("| G refiner2 loss: {:.4f} | D decider2 loss {:.4f}".format(loss_g_refiner2, loss_d_decider2), end=' ')
-                print("| GP loss fake-real: {:.4f}".format(loss_gp_fr), end=' ')
-                print("| GP loss real-fake: {:.4f}".format(loss_gp_rf), end=' ')
-                print("| GP loss fake refined1-fake: {:.4f}".format(loss_gp_decider_fr), end=' ')
-                print("| GP loss fake refined2-fake: {:.4f}".format(loss_gp_decider2_fr))
-            else:
-                print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
-                print("| G refiner loss: {:.4f} | D decider loss {:.4f}".format(loss_g_refiner, loss_d_decider), end=' ')
-                print("| G refiner2 loss: {:.4f} | D decider2 loss {:.4f}".format(loss_g_refiner2, loss_d_decider2))
-            print("\t\t\tAccuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(acc_rr, acc_rf, acc_fr))
-            print("\t\t\tAccuracy D decider real-real: {:.4f} | fake refined1-real {:.4f}".format(acc_decider_rr, acc_decider_fr))
-            print("\t\t\tAccuracy D decider2 real-real: {:.4f} | fake refined2-real {:.4f}".format(acc_decider2_rr, acc_decider2_fr))
+            ## Save refined2
+            filename = "{:08}.png".format(_id)
+            try:
+                model.save_img_test_single(_refined2.clone(), filename, real=False)
+            except Exception as e:
+                print('Fake image {} saving failed.'.format(filename), e, 'Passing.')
 
-        ## Save visual outputs
+            ## Save real
+            try:
+                model.save_img_test_single(real_image.clone(), filename, real=True)
+            except Exception as e:
+                print('Real image {} saving failed.'.format(filename), e, 'Passing.')
+
+        ## Save grid
         try:
-            output_filename = "{}_{:08}.png".format(model.model_name, iteration)
+            grid_filename = "{}_{:08}.png".format(model.model_name, iteration)
             grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, val_dataset.word2vec_model)
-            model.save_img_test_output(grid_img_pil, output_filename)
+            model.save_img_test_grid(grid_img_pil, grid_filename)
         except Exception as e:
             print('Grid image generation failed.', e, 'Passing.')
 
-    total_loss_g /= (i + 1)
-    total_loss_d /= (i + 1)
-    total_loss_g_refiner /= (i + 1)
-    total_loss_d_decider /= (i + 1)
-    total_loss_g_refiner2 /= (i + 1)
-    total_loss_d_decider2 /= (i + 1)
-    total_loss_gp_fr /= (i + 1)
-    total_loss_gp_rf /= (i + 1)
-    total_loss_gp_decider_fr /= (i + 1)
-    total_loss_gp_decider2_fr /= (i + 1)
-    total_acc_rr /= (i + 1)
-    total_acc_rf /= (i + 1)
-    total_acc_fr /= (i + 1)
-    total_acc_decider_rr /= (i + 1)
-    total_acc_decider_fr /= (i + 1)
-    total_acc_decider2_rr /= (i + 1)
-    total_acc_decider2_fr /= (i + 1)
-    if CONFIG.GAN_LOSS1 == 'wgangp':
-        print("\t\tG loss: {:.4f} | D loss: {:.4f}".format(total_loss_g, total_loss_d), end=' ')
-        print("| {p} G refiner loss: {:.4f} | {p} D decider loss: {:.4f}".format(total_loss_g_refiner, total_loss_d_decider), end=' ')
-        print("| {p} G refiner2 loss: {:.4f} | {p} D decider2 loss: {:.4f}".format(total_loss_g_refiner2, total_loss_d_decider2), end=' ')
-        print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')
-        print("| GP loss real-fake: {:.4f}".format(total_loss_gp_rf), end=' ')
-        print("| GP loss real refined1-fake: {:.4f}".format(total_loss_gp_decider_fr), end=' ')
-        print("| GP loss real refined2-fake: {:.4f}".format(total_loss_gp_decider2_fr))
-    else:
-        print("\t\tG loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d), end=' ')
-        print("\t\t{p} G refiner loss: {:.4f} | {p} D decider loss: {:.4f}".format(total_loss_g_refiner, total_loss_d_decider))
-        print("\t\t{p} G refiner2 loss: {:.4f} | {p} D decider2 loss: {:.4f}".format(total_loss_g_refiner2, total_loss_d_decider2))
-    print("\t\tAccuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
-    print("\t\tAccuracy D decider real-real: {:.4f} | fake refined1-real {:.4f}".format(total_acc_decider_rr, total_acc_decider_fr))
-    print("\t\tAccuracy D decider2 real-real: {:.4f} | fake refined2-real {:.4f}".format(total_acc_decider2_rr, total_acc_decider2_fr))
     print("\tTesting time: {:.2f} seconds".format(time.time() - start))

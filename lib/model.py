@@ -9,14 +9,9 @@ import torch
 import torchvision
 from torchvision.utils import make_grid
 
-try:
-    from .arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
-    from .utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
-                        get_uuid, words2image, ImageUtilities)
-except ImportError:
-    from arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
-    from utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
-                        get_uuid, words2image, ImageUtilities)
+from lib.arch import GeneratorResNet, DiscriminatorStack, GeneratorRefinerUNet, DiscriminatorDecider, GeneratorRefinerUNet2, DiscriminatorDecider2
+from lib.utils import (GANLoss, get_single_gradient_penalty, get_paired_gradient_penalty,
+                    get_uuid, words2image, ImageUtilities)
 
 class BaseModel(ABC):
 
@@ -90,7 +85,7 @@ class GANModel(BaseModel):
 
     def __init__(self, config, model_file=None, mode='train', reset_lr=False):
 
-        assert mode in ['train', 'test', 'pred'], 'Mode should be one of "train, test, pred"'
+        assert mode in ['train', 'test'], 'Mode should be one of "train, test"'
         self.config = config
         self.mode = mode
         self.reset_lr = reset_lr
@@ -132,12 +127,10 @@ class GANModel(BaseModel):
         self.G_refiner2 = GeneratorRefinerUNet2(config).to(self.device)
 
         ## Init D, optimizers, schedulers
-        if self.mode in ['train', 'test']:
+        if self.mode in ['train']:
             self.D = DiscriminatorStack(config).to(self.device)
             self.D_decider = DiscriminatorDecider(config).to(self.device)
             self.D_decider2 = DiscriminatorDecider2(config).to(self.device)
-
-        if self.mode in ['train']:
             self.G_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=False).to(self.device)
             self.D_criterionGAN = GANLoss(self.gan_loss1, self.device, accuracy=True).to(self.device)
             self.G_refiner_criterionGAN = GANLoss(self.gan_loss2, self.device, accuracy=True).to(self.device)
@@ -274,7 +267,7 @@ class GANModel(BaseModel):
             self.set_model_dir(model_file)
             print("{} loaded.".format(self.model_dir))
             if self.mode == 'test':
-                self.set_output_dir(model_file)
+                self.set_output_dir()
         else:
             ## Init weights
             self.init_weights(self.G, weight_init, init_gain=init_gain)
@@ -302,7 +295,7 @@ class GANModel(BaseModel):
         print("# parameters of G: {:2E}".format(sum(p.numel() for p in self.G.parameters())))
         print("# parameters of G refiner: {:2E}".format(sum(p.numel() for p in self.G_refiner.parameters())))
         print("# parameters of G refiner2: {:2E}".format(sum(p.numel() for p in self.G_refiner2.parameters())))
-        if self.mode in ['train', 'test']:
+        if self.mode in ['train']:
             print("# parameters of D: {:2E}".format(sum(p.numel() for p in self.D.parameters())))
             print("# parameters of D decider: {:2E}".format(sum(p.numel() for p in self.D_decider.parameters())))
             print("# parameters of D decider2: {:2E}".format(sum(p.numel() for p in self.D_decider2.parameters())))
@@ -352,11 +345,10 @@ class GANModel(BaseModel):
         self.G.load_state_dict(state['g'])
         self.G_refiner.load_state_dict(state['g_refiner'])
         self.G_refiner2.load_state_dict(state['g_refiner2'])
-        if self.mode in ['train', 'test']:
+        if self.mode in ['train']:
             self.D.load_state_dict(state['d'])
             self.D_decider.load_state_dict(state['d_decider'])
             self.D_decider2.load_state_dict(state['d_decider2'])
-        if self.mode in ['train']:
             self.G_optimizer.load_state_dict(state['g_optim'])
             self.D_optimizer.load_state_dict(state['d_optim'])
             self.G_refiner_optimizer.load_state_dict(state['g_refiner_optim'])
@@ -382,11 +374,10 @@ class GANModel(BaseModel):
         self.state_dict['g'] = self.G.state_dict()
         self.state_dict['g_refiner'] = self.G_refiner.state_dict()
         self.state_dict['g_refiner2'] = self.G_refiner2.state_dict()
-        if self.mode in ['train', 'test']:
+        if self.mode in ['train']:
             self.state_dict['d'] = self.D.state_dict()
             self.state_dict['d_decider'] = self.D_decider.state_dict()
             self.state_dict['d_decider2'] = self.D_decider2.state_dict()
-        if self.mode in ['train']:
             self.state_dict['g_optim'] = self.G_optimizer.state_dict()
             self.state_dict['d_optim'] = self.D_optimizer.state_dict()
             self.state_dict['g_refiner_optim'] = self.G_refiner_optimizer.state_dict()
@@ -477,20 +468,9 @@ class GANModel(BaseModel):
         real_wvs = real_wvs.view(self.batch_size, -1)
         fake_wvs = fake_wvs.view(self.batch_size, -1)
 
-        # ## Make pairs
-        # real_real_first_pair = (real_first_images, real_wv)
-        # real_real_second_pair = (real_second_images, real_wv)
-        # real_real_pair = (real_images, real_wv)
-        # real_fake_pair = (real_first_images, fake_wv)
-        # fake_real_pair = (fake_images, real_wv)
-        # refined1_real_pair = (refined1, real_wv)
-        # refined2_real_pair = (refined2, real_wv)
-
         return real_first_images, real_second_images, real_images,\
                fake_images, refined1, refined2,\
                real_wvs, fake_wvs
-        # return real_real_first_pair, real_real_second_pair, real_real_pair, real_fake_pair, \
-        #        fake_real_pair, refined1_real_pair, refined2_real_pair
 
     def backward_D(self, real_first_images, fake_images, real_wvs, fake_wvs, update=True, prob_flip_labels=0.0):
 
@@ -701,33 +681,28 @@ class GANModel(BaseModel):
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
 
-    def save_img_test_output(self, img_pil, filename):
-        output_dir = os.path.join(self.output_dir)
+    def save_img_test_grid(self, img_pil, filename):
+        output_dir = os.path.join(self.output_dir, 'grid')
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
 
-    def save_grad_output(self, filename):
-        output_dir = os.path.join(self.model_dir, 'output')
+    def save_img_test_single(self, img_tensor, filename, real):
+
+        if self.inv_normalize:
+            img_tensor = self.inverse_normalizer(img_tensor)
+
+        img = torch.Tensor(img_tensor.detach().cpu().numpy().transpose(1, 2, 0))
+        img_pil = Image.fromarray(np.array(img * 255, dtype=np.uint8))
+
+        if real:
+            output_dir = os.path.join(self.output_dir, 'real')
+        else:
+            output_dir = os.path.join(self.output_dir, 'fake')
         os.makedirs(output_dir, exist_ok=True)
-        G_output_file = os.path.join(output_dir, 'G_grads_' + filename)
-        D_output_file = os.path.join(output_dir, 'D_grads' + filename)
-
-        if np.all([param.requires_grad for param in self.G.parameters()]):
-            get_G_dot = register_hooks(self.loss_G)
-            try:
-                G_dot = get_G_dot()
-            except AssertionError:
-                return
-            G_dot.save(G_output_file)
-        if np.all([param.requires_grad for param in self.D.parameters()]):
-            get_D_dot = register_hooks(self.loss_D)
-            try:
-                D_dot = get_D_dot()
-            except AssertionError:
-                return
-            D_dot.save(D_output_file)
-
+        output_file = os.path.join(output_dir, filename)
+        img_pil.save(output_file)
+        
     def forward(self, net, x):
         return net(x)
 
