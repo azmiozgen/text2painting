@@ -74,11 +74,6 @@ class TextArtDataLoader(Dataset):
         else:
             return None
 
-    # def preprocess(self, img):
-    #     img_tensor = to_tensor(img)
-    #     # img_tensor = normalize(img_tensor, mean=[el.mean() for el in img_tensor], std=[el.std() for el in img_tensor])
-    #     return img_tensor
-
     def load(self, image_file):
         img = Image.open(image_file)
         if img.mode != 'RGB':
@@ -90,7 +85,6 @@ class TextArtDataLoader(Dataset):
 
         # Load image
         img = self.load(image_file)
-        # img = self.preprocess(img)
 
         ## Get label sentence
         label_sentence = self.labels_dict[image_file]

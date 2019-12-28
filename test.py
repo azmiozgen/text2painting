@@ -29,6 +29,7 @@ if __name__ == "__main__":
     from model import GANModel
     from lib.config import Config
     from lib.dataset import AlignCollate, ImageBatchSampler, TextArtDataLoader
+    from lib.utils import generate_noise
 
     CONFIG = Config()
 
@@ -55,7 +56,7 @@ if __name__ == "__main__":
     model = GANModel(CONFIG, model_file=model_file, mode='test', reset_lr=False)
     time.sleep(1.0)
 
-    print("\nTesting starting..")
+    print("\nTesting..")
     start = time.time()
 
     data_loader = val_loader
@@ -83,6 +84,8 @@ if __name__ == "__main__":
         ## Forward G_refiner2
         refined2 = model.forward(model.G_refiner2, refined1)
 
+        ## Noise output
+        noise_output = generate_noise(CONFIG)
 
         for j, (_refined2, real_image) in enumerate(zip(refined2, real_images)):
             _id = i * batch_size + j
@@ -90,15 +93,21 @@ if __name__ == "__main__":
             ## Save refined2
             filename = "{:08}.png".format(_id)
             try:
-                model.save_img_test_single(_refined2.clone(), filename, real=False)
+                model.save_img_test_single(_refined2.clone(), filename, kind='fake')
             except Exception as e:
                 print('Fake image {} saving failed.'.format(filename), e, 'Passing.')
 
             ## Save real
             try:
-                model.save_img_test_single(real_image.clone(), filename, real=True)
+                model.save_img_test_single(real_image.clone(), filename, kind='real')
             except Exception as e:
                 print('Real image {} saving failed.'.format(filename), e, 'Passing.')
+
+            ## Save noise
+            try:
+                model.save_img_test_single(noise_output.clone(), filename, kind='noise')
+            except Exception as e:
+                print('Noise image {} saving failed.'.format(filename), e, 'Passing.')
 
         ## Save grid
         try:

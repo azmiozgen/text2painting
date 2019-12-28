@@ -209,11 +209,12 @@ class GANModel(BaseModel):
                                                                                      min_lr=lr_min_val)
 
         ## Parallelize over gpus
-        if torch.cuda.device_count() > 1:
+        if self.device == torch.device('cuda') and torch.cuda.device_count() > 1:
+        # if torch.cuda.device_count() > 1:
             self.G = torch.nn.DataParallel(self.G)
             self.G_refiner = torch.nn.DataParallel(self.G_refiner)
             self.G_refiner2 = torch.nn.DataParallel(self.G_refiner2)
-            if self.mode in ['train', 'test']:
+            if self.mode in ['train']:
                 self.D = torch.nn.DataParallel(self.D)
                 self.D_decider = torch.nn.DataParallel(self.D_decider)
                 self.D_decider2 = torch.nn.DataParallel(self.D_decider2)
@@ -341,7 +342,10 @@ class GANModel(BaseModel):
         ## Get epoch
         self.epoch = int(os.path.basename(model_file).split('_')[1]) + 1
 
-        state = torch.load(model_file)
+        if self.device == torch.device('cpu'):
+            state = torch.load(model_file, map_location=lambda storage, loc: storage)
+        else:
+            state = torch.load(model_file)
         self.G.load_state_dict(state['g'])
         self.G_refiner.load_state_dict(state['g_refiner'])
         self.G_refiner2.load_state_dict(state['g_refiner2'])
@@ -687,18 +691,16 @@ class GANModel(BaseModel):
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
 
-    def save_img_test_single(self, img_tensor, filename, real):
+    def save_img_test_single(self, img_tensor, filename, kind):
 
+        assert kind in ['real', 'fake', 'noise']
         if self.inv_normalize:
             img_tensor = self.inverse_normalizer(img_tensor)
 
         img = torch.Tensor(img_tensor.detach().cpu().numpy().transpose(1, 2, 0))
         img_pil = Image.fromarray(np.array(img * 255, dtype=np.uint8))
 
-        if real:
-            output_dir = os.path.join(self.output_dir, 'real')
-        else:
-            output_dir = os.path.join(self.output_dir, 'fake')
+        output_dir = os.path.join(self.output_dir, kind)
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, filename)
         img_pil.save(output_file)
