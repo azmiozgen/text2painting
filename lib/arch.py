@@ -308,7 +308,7 @@ class DiscriminatorStack(nn.Module):
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
                 spectral_norm(nn.Conv2d(ndf * 4, self.out_channels, kernel_size=4, stride=2, padding=1, bias=False)),       ## ndf * 8 x H/32 x W/32
-                nn.BatchNorm2d(self.out_channels),
+                # nn.BatchNorm2d(self.out_channels),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
                 nn.Dropout2d(dropout)
@@ -327,7 +327,7 @@ class DiscriminatorStack(nn.Module):
                 nn.BatchNorm2d(ndf * 4),
                 nn.LeakyReLU(0.2, inplace=True),
                 nn.Conv2d(ndf * 4, out_channels, kernel_size=4, stride=2, padding=1, bias=False),       ## ndf * 8 x H/32 x W/32
-                nn.BatchNorm2d(self.out_channels),
+                # nn.BatchNorm2d(self.out_channels),
                 # nn.LeakyReLU(0.2, inplace=True),
                 # nn.Conv2d(ndf * 8, 1, kernel_size=4, stride=2, padding=1, bias=False),       ## 1 x H/64 x W/64
                 nn.Dropout2d(dropout)

@@ -149,7 +149,7 @@ class AlignCollate(object):
 
         if self.mode == 'train':
             if self.random_resolution:
-                self.random_res = ImageUtilities.image_random_resolution([0.7, 1.3])
+                self.random_res = ImageUtilities.image_random_resolution([0.9, 1.1])
 
             if self.horizontal_flipping:
                 self.horizontal_flipper = ImageUtilities.image_random_horizontal_flipper()
@@ -161,7 +161,7 @@ class AlignCollate(object):
                 self.color_jitter = ImageUtilities.image_random_color_jitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.15)
 
             if self.random_gamma:
-                self.random_gamma_adjuster = ImageUtilities.image_random_gamma(gamma_range=[0.7, 1.3], gain=1)
+                self.random_gamma_adjuster = ImageUtilities.image_random_gamma(gamma_range=[0.8, 1.2], gain=1)
 
             if self.random_channel_swapping:
                 self.channel_swapper = ImageUtilities.image_random_channel_swapper(p=0.5)
