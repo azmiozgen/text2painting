@@ -56,7 +56,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.RANDOM_CHANNEL_SWAPPING = False
         self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
-        self.RANDOM_RESOLUTION = False
+        self.RANDOM_RESOLUTION = True
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True
@@ -89,7 +89,7 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
 
         ## Hyper-params
         self.BATCH_SIZE = 16
-        self.N_EPOCHS = 500
+        self.N_EPOCHS = 1000
         self.G_LR = 1e-4
         self.D_LR = 2e-4
         self.G_REFINER_LR = 1e-4
