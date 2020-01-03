@@ -30,5 +30,5 @@ class Config():
         self.WV_MIN_ALPHA = 1e-5    ## Minimum learning rate
         self.WV_EPOCHS = 500        ## Training epochs
         self.WV_NEGATIVE = 20       ## If > 0, negative sampling will be used, 
-                                    ## the int for negative specifies how many “noise words” should be drawn (usually between 5-20). 
+                                    ## Integer for negative specifies how many “noise words” should be drawn (usually between 5-20). 
                                     ## If set to 0, no negative sampling is used.

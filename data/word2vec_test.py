@@ -41,6 +41,7 @@ if __name__ == "__main__":
     ## Load model
     print("Loading {}".format(MODEL_FILE))
     word2vec_master = Word2Vec.load(MODEL_FILE)
+    print("\tVocabulary shape:", word2vec_master.wv.vectors.shape)
 
     ## Test model
     keywords = ['dog', 'cat', 'female', 'male', 'horse']
