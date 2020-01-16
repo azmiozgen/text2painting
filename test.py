@@ -80,22 +80,35 @@ if __name__ == "__main__":
 
         ## Forward G_refiner
         refined1 = model.forward(model.G_refiner, fake_images)
-        
+
         ## Forward G_refiner2
         refined2 = model.forward(model.G_refiner2, refined1)
 
-        ## Noise output
-        noise_output = generate_noise(CONFIG)
 
-        for j, (_refined2, real_image) in enumerate(zip(refined2, real_images)):
+        for j, (fake, _refined1, _refined2, real_image) in enumerate(zip(fake_images, refined1, refined2, real_images)):
             _id = i * batch_size + j
-
-            ## Save refined2
             filename = "{:08}.png".format(_id)
+
+            ## Noise output
+            noise_output = generate_noise(CONFIG)
+
+            ## Save fake
             try:
-                model.save_img_test_single(_refined2.clone(), filename, kind='fake')
+                model.save_img_test_single(fake.clone(), filename, kind='fake')
             except Exception as e:
                 print('Fake image {} saving failed.'.format(filename), e, 'Passing.')
+
+            ## Save refined
+            try:
+                model.save_img_test_single(_refined1.clone(), filename, kind='refined')
+            except Exception as e:
+                print('Refined image {} saving failed.'.format(filename), e, 'Passing.')
+
+            ## Save refined2
+            try:
+                model.save_img_test_single(_refined2.clone(), filename, kind='refined2')
+            except Exception as e:
+                print('Refined2 image {} saving failed.'.format(filename), e, 'Passing.')
 
             ## Save real
             try:

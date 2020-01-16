@@ -693,7 +693,7 @@ class GANModel(BaseModel):
 
     def save_img_test_single(self, img_tensor, filename, kind):
 
-        assert kind in ['real', 'fake', 'noise']
+        assert kind in ['real', 'fake', 'refined', 'refined2', 'noise']
         if self.inv_normalize:
             img_tensor = self.inverse_normalizer(img_tensor)
 
