@@ -77,8 +77,8 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.LAMBDA_L1 = 100.0
         self.NORM_LAYER = torch.nn.BatchNorm2d
-        self.G_DROPOUT = 0.1
-        self.D_DROPOUT = 0.8
+        self.G_DROPOUT = 0.2
+        self.D_DROPOUT = 0.65
         self.USE_SPECTRAL_NORM = True
         self.MINIBATCH_DISCRIMINATION = True
         self.N_BLOCKS = 9
