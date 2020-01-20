@@ -6,7 +6,7 @@ import time
 from io import BytesIO
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image, ImageFilter, ImageOps
 
 import pandas as pd
 import torch
@@ -135,10 +135,12 @@ class AlignCollate(object):
         self.random_channel_swapping = config.RANDOM_CHANNEL_SWAPPING
         self.random_gamma = config.RANDOM_GAMMA
         self.random_resolution = config.RANDOM_RESOLUTION
+        self.elastic_deformation = config.ELASTIC_DEFORMATION
+        self.sharpening = config.SHARPENING
+        self.equalizing = config.EQUALIZING
 
         self.sentence_length = config.SENTENCE_LENGTH
         self.noise_length = config.NOISE_LENGTH
-
 
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
@@ -149,7 +151,7 @@ class AlignCollate(object):
 
         if self.mode == 'train':
             if self.random_resolution:
-                self.random_res = ImageUtilities.image_random_resolution([0.9, 1.1])
+                self.random_res = ImageUtilities.image_random_resolution([0.75, 1.25])
 
             if self.horizontal_flipping:
                 self.horizontal_flipper = ImageUtilities.image_random_horizontal_flipper()
@@ -161,13 +163,16 @@ class AlignCollate(object):
                 self.color_jitter = ImageUtilities.image_random_color_jitter(brightness=0.15, contrast=0.15, saturation=0.15, hue=0.15)
 
             if self.random_gamma:
-                self.random_gamma_adjuster = ImageUtilities.image_random_gamma(gamma_range=[0.8, 1.2], gain=1)
+                self.random_gamma_adjuster = ImageUtilities.image_random_gamma(gamma_range=[0.7, 1.3], gain=1)
 
             if self.random_channel_swapping:
                 self.channel_swapper = ImageUtilities.image_random_channel_swapper(p=0.5)
 
             if self.random_grayscale:
                 self.grayscaler = ImageUtilities.image_random_grayscaler(p=0.5)
+
+            if self.elastic_deformation:
+                self.elastic_deformer = ImageUtilities.image_elastic_deformer(alpha_range=[500, 1300], sigma_range=[9, 10])
 
         self.resizer_first = ImageUtilities.image_resizer(self.image_height_first, self.image_width_first)
         self.resizer_second = ImageUtilities.image_resizer(self.image_height_second, self.image_width_second)
@@ -176,12 +181,12 @@ class AlignCollate(object):
 
     def __preprocess(self, image, stage):
         assert stage in [1, 2, 3], 'Wrong stage number {}. Choose among [1, 2, 3]'.format(stage)
-        ## 'stage' for smaller image resizing for levels of GAN (first stage 64x64, second stage is 128x128, third stage is 256x256)
+        ## 'stage' for image resizing for the levels of GAN (first stage 64x64, second stage is 128x128, third stage is 256x256)
 
         if self.mode == 'train':
 
             if self.random_blurriness:
-                image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 1.5))
+                image = image.filter(ImageFilter.GaussianBlur(radius=np.random.rand() * 3.0))
 
             # ## Pad or crop_lr image with low prob.
             # if np.random.rand() < 0.005:
@@ -193,7 +198,7 @@ class AlignCollate(object):
                 image = self.random_res(image)
 
             if self.horizontal_flipping:
-                is_flip = random.random() < 0.5
+                is_flip = random.random() < 0.1
                 image = self.horizontal_flipper(image, is_flip)
 
             if self.random_rotation:
@@ -214,6 +219,17 @@ class AlignCollate(object):
 
             if self.random_grayscale:
                 image = self.grayscaler(image)
+
+            if self.elastic_deformation:
+                image = self.elastic_deformer(image)
+
+            if self.sharpening:
+                if random.random() < 0.1:
+                    image = image.filter(ImageFilter.SHARPEN)
+
+            if self.equalizing:
+                if random.random() < 0.1:
+                    image = ImageOps.equalize(image, mask=None)
 
         if stage == 1:
             image = self.resizer_first(image)

@@ -52,11 +52,14 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         self.RANDOM_BLURRINESS = True
         self.HORIZONTAL_FLIPPING = False     ## BAD!
         self.RANDOM_ROTATION = False
-        self.COLOR_JITTERING = False
+        self.COLOR_JITTERING = True
         self.RANDOM_CHANNEL_SWAPPING = False
         self.RANDOM_GAMMA = True
         self.RANDOM_GRAYSCALE = False
         self.RANDOM_RESOLUTION = True
+        self.ELASTIC_DEFORMATION = False
+        self.SHARPENING = False
+        self.EQUALIZING = False
 
         ## Word vectors options
         self.LOAD_WORD_VECTORS = True

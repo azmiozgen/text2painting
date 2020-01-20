@@ -3,7 +3,10 @@ import math
 import random
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
+
+from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage.filters import gaussian_filter
 
 try:
     import accimage
@@ -264,3 +267,33 @@ class InvNormalization(object):
         for t, m, s in zip(tensor, self.mean, self.std):
             t.mul_(s).add_(m)
         return tensor
+
+class ElasticDeformation(object):
+    """Elastic deformation of images as described in [Simard2003]_.
+    .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
+       Convolutional Neural Networks applied to Visual Document Analysis", in
+       Proc. of the International Conference on Document Analysis and
+       Recognition, 2003.
+    """
+    def __init__(self, alpha_range, sigma_range):
+        self.random_state = np.random.RandomState(None)
+        self.alpha_range = np.arange(alpha_range[0], alpha_range[1], 1)
+        self.sigma_range = np.arange(sigma_range[0], sigma_range[1], 1)
+
+    def __call__(self, img):
+        img_np = np.array(img)
+        shape = img_np.shape
+        alpha = np.random.choice(self.alpha_range)
+        sigma = np.random.choice(self.sigma_range)
+        dx = gaussian_filter((self.random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
+        dy = gaussian_filter((self.random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
+        dz = np.zeros_like(dx)
+
+        x, y, z = np.meshgrid(np.arange(shape[1]), np.arange(shape[0]), np.arange(shape[2]))
+        indices = np.reshape(y + dy, (-1, 1)), np.reshape(x + dx, (-1, 1)), np.reshape(z, (-1, 1))
+
+        deformed_image = map_coordinates(img_np, indices, order=1, mode='reflect')
+        deformed_image = deformed_image.reshape(img_np.shape)
+        img = Image.fromarray(img_np)
+
+        return img

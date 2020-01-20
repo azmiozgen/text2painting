@@ -10,7 +10,8 @@ from graphviz import Digraph
 from torch.autograd import Variable, Function
 
 from lib.preprocess import (RandomChannelSwap, RandomGamma, RandomHorizontalFlip,
-                        RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization)
+                            RandomResizedCrop, RandomResolution, RandomRotate, InvNormalization,
+                            ElasticDeformation)
 from lib.config import Config
 
 class GANLoss(nn.Module):
@@ -196,6 +197,10 @@ class ImageUtilities(object):
     @staticmethod
     def image_random_resolution(ratio_range):
         return RandomResolution(ratio_range)
+
+    @staticmethod
+    def image_elastic_deformer(alpha_range, sigma_range):
+        return ElasticDeformation(alpha_range, sigma_range)
 
 def get_uuid():
     return str(uuid.uuid4()).split('-')[-1]
