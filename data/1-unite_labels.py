@@ -62,7 +62,7 @@ if __name__ == '__main__':
             ## Check image integrity
             try:
                 img = Image.open(image_file) 
-                if img.mode != 'RGB': 
+                if img.mode != 'RGB':
                     continue
             except (Exception, Warning) as e:
                 print("Bad image", image_file, e)
