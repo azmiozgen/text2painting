@@ -1,155 +1,147 @@
 import argparse
+import os
+import random
+import sys
+import time
 
+from gensim.models import Word2Vec
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+from lib.config import Config
+
+def get_word_vector(word2vec_model, word):
+    if word2vec_model.wv.vocab.get(word):
+        return word2vec_model.wv[word]
+    else:
+        return None
+
+def check_vector_in_vocab(word2vec_model, word_vector, min_similarity_prob):
+    word_vector = np.array(word_vector)
+    word, prob = word2vec_model.wv.similar_by_vector(word_vector, topn=1)[0]
+    return prob > min_similarity_prob
+
+def clean_wvs(word2vec_model, word_vectors, min_similarity_prob):
+    indices = []
+    for i, wv in enumerate(word_vectors):
+        if check_vector_in_vocab(word2vec_model, wv, min_similarity_prob):
+            indices.append(i)
+    return word_vectors[indices]
+
+def normalize_wvs(wv_tensor):
+    shifted = wv_tensor - wv_tensor.min()
+    norm = shifted / ((shifted).max() + 1e-10)
+    return norm * 2 - 1
+
+def get_similar_wv_by_vector(word2vec_model, word_vector, word_vectors_similar_pad_topN):
+    word_vector = np.array(word_vector)
+    _top_similar_words = word2vec_model.wv.similar_by_vector(word_vector, 
+                                                             topn=word_vectors_similar_pad_topN + 1)
+    top_similar_words = np.array(_top_similar_words)[1:]   ## Do not take word itself (the most similar)
+    try:
+        similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=False)[0]
+    except ValueError:
+        similar_word = np.random.choice(top_similar_words[:, 0], 1, replace=True)[0]
+
+    return get_word_vector(word2vec_model, similar_word)
+
+def pad_wvs_with_similar_wvs(word2vec_model, word_vectors, final_length, word_vectors_similar_pad_topN):
+    while len(word_vectors) < final_length:
+        word_vector = random.choice(word_vectors)
+        similar_vector = torch.Tensor(get_similar_wv_by_vector(word2vec_model, word_vector, word_vectors_similar_pad_topN)).unsqueeze(0)
+        word_vectors = torch.cat((word_vectors, similar_vector))
+
+    return word_vectors
+
+def pad_wvs_with_noise(word_vectors, final_length):
+    pad_length = final_length - len(word_vectors)
+    padding_tensor = torch.rand(pad_length, word_vectors.size()[1]) * 2 - 1   ## [-1, 1]
+    word_vectors = torch.cat((word_vectors, padding_tensor))
+
+    return word_vectors
+
+def crop_wvs(word_vectors, final_length):
+    return word_vectors[torch.randperm(final_length)]
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, help='Model file to load')
+    parser.add_argument('--input', type=str, help='Input file to load')
     args = parser.parse_args()
     model_file = args.model
+    input_file = args.input
 
-    ## Data loader
-    print("Data loader initializing..")
-    val_dataset = TextArtDataLoader(CONFIG, mode='val')
-    val_align_collate = AlignCollate(CONFIG, 'val')
-    # val_batch_sampler = ImageBatchSampler(CONFIG, mode='val')
-    val_loader = DataLoader(val_dataset,
-                            batch_size=CONFIG.BATCH_SIZE,
-                            shuffle=False,
-                            num_workers=CONFIG.N_WORKERS,
-                            pin_memory=True,
-                            collate_fn=val_align_collate,
-                            # sampler=val_batch_sampler,
-                            drop_last=True,
-                            )
-    print("\tValidation size:", len(val_dataset))
-    n_val_batch = len(val_dataset) // CONFIG.BATCH_SIZE
-    time.sleep(0.5)
+    CONFIG = Config()
+    # CONFIG.DEVICE = torch.device('cpu')
+
+    ## Import model
+    model_dir = os.path.dirname(os.path.abspath(model_file))
+    model_lib_dir = os.path.join(model_dir, 'lib')
+    sys.path.append(model_lib_dir)
+    from model import GANModel
 
     ## Init model with G
-    print("\nModel initializing..")
-    model = GANModel(CONFIG, model_file=model_file, mode='val', reset_lr=False)
-    time.sleep(1.0)
-
     start = time.time()
-
-    total_loss_g = 0.0
-    total_loss_g_refiner = 0.0
-    total_loss_g_refiner2 = 0.0
-
-    data_loader = val_loader
-    n_batch = n_val_batch
+    print("\nModel initializing..")
+    model = GANModel(CONFIG, model_file=model_file, mode='test', reset_lr=False)
     model.G.eval()
     model.G_refiner.eval()
     model.G_refiner2.eval()
     train_G = False
 
-    for i, data in enumerate(data_loader):
-        iteration = i
+    ## Read input file
+    with open(input_file, 'r') as f:
+        lines = f.readlines()
 
-        ## Get data
-        real_first_images, real_second_images, real_images, real_wvs, fake_wvs = data
-        batch_size = real_images.size()[0]
+    ## Get Word2Vec model
+    word2vec_model_file = CONFIG.WORD2VEC_MODEL_FILE
+    word2vec_model = Word2Vec.load(word2vec_model_file)
 
-        ## Forward G
-        real_wvs_flat = real_wvs.view(batch_size, -1)
-        fake_images = model.forward(model.G, real_wvs_flat)
+    word_vectors_list = []
+    for i, line in enumerate(lines):
+        label_sentence = line.split(',')
+        word_vectors = []
+        for word in label_sentence: 
+            vector = get_word_vector(word2vec_model, word)
+            if vector is not None:
+                word_vectors.append(vector)
 
-        ## Forward G_refiner
-        refined1 = model.forward(model.G_refiner, fake_images)
-        
-        ## Forward G_refiner2
-        refined2 = model.forward(model.G_refiner2, refined1)
+        ## If empty, make noisy vector (-1, 1)
+        if len(word_vectors) == 0:
+            word_vectors = torch.rand(1, word2vec_model.vector_size) * 2.0 - 1.0
+        else:
+            word_vectors = torch.Tensor(word_vectors)
 
-        ## Update total loss
-        loss_g, _, loss_g_refiner, _, loss_g_refiner2, _, _, _, _, _ = model.get_losses()
-        total_loss_g += loss_g
-        total_loss_g_refiner += loss_g_refiner
-        total_loss_g_refiner2 += loss_g_refiner2
+        word_vectors = normalize_wvs(word_vectors)
 
-        ## Get D accuracy
-        acc_rr, acc_rf, acc_fr, acc_decider_rr, acc_decider_fr, acc_decider2_rr, acc_decider2_fr = model.get_D_accuracy()
-        total_acc_rr += acc_rr
-        total_acc_rf += acc_rf
-        total_acc_fr += acc_fr
-        total_acc_decider_rr += acc_decider_rr
-        total_acc_decider_fr += acc_decider_fr
-        total_acc_decider2_rr += acc_decider2_rr
-        total_acc_decider2_fr += acc_decider2_fr
+        ## Pad or crop true wvs
+        if len(word_vectors) < CONFIG.SENTENCE_LENGTH:
+            word_vectors = pad_wvs_with_similar_wvs(word2vec_model, word_vectors, CONFIG.SENTENCE_LENGTH, CONFIG.WORD_VECTORS_SIMILAR_PAD_TOPN)
+        else:
+            word_vectors = crop_wvs(word_vectors, CONFIG.SENTENCE_LENGTH)
 
-        ## Save logs
-        if iteration % CONFIG.N_LOG_BATCH == 0:
-            log_tuple = phase, epoch, iteration, loss_g, loss_d, loss_g_refiner, loss_d_decider, loss_g_refiner2, loss_d_decider2,\
-                            acc_rr, acc_rf, acc_fr, acc_decider_rr, acc_decider_fr, acc_decider2_rr, acc_decider2_fr
-            model.save_logs(log_tuple)
+        ## Add noise
+        if CONFIG.NOISE_LENGTH > 0:
+            word_vectors = pad_wvs_with_noise(word_vectors, CONFIG.SENTENCE_LENGTH + CONFIG.NOISE_LENGTH)
 
-        # Print logs
-        if i % CONFIG.N_PRINT_BATCH == 0:
-            print("\t\tBatch {: 4}/{: 4}:".format(i, n_batch), end=' ')
-            if CONFIG.GAN_LOSS1 == 'wgangp':
-                print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
-                print("| G refiner loss: {:.4f} | D decider loss {:.4f}".format(loss_g_refiner, loss_d_decider), end=' ')
-                print("| G refiner2 loss: {:.4f} | D decider2 loss {:.4f}".format(loss_g_refiner2, loss_d_decider2), end=' ')
-                print("| GP loss fake-real: {:.4f}".format(loss_gp_fr), end=' ')
-                print("| GP loss real-fake: {:.4f}".format(loss_gp_rf), end=' ')
-                print("| GP loss fake refined1-fake: {:.4f}".format(loss_gp_decider_fr), end=' ')
-                print("| GP loss fake refined2-fake: {:.4f}".format(loss_gp_decider2_fr))
-            else:
-                print("G loss: {:.4f} | D loss: {:.4f}".format(loss_g, loss_d), end=' ')
-                print("| G refiner loss: {:.4f} | D decider loss {:.4f}".format(loss_g_refiner, loss_d_decider), end=' ')
-                print("| G refiner2 loss: {:.4f} | D decider2 loss {:.4f}".format(loss_g_refiner2, loss_d_decider2))
-            print("\t\t\tAccuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(acc_rr, acc_rf, acc_fr))
-            print("\t\t\tAccuracy D decider real-real: {:.4f} | fake refined1-real {:.4f}".format(acc_decider_rr, acc_decider_fr))
-            print("\t\t\tAccuracy D decider2 real-real: {:.4f} | fake refined2-real {:.4f}".format(acc_decider2_rr, acc_decider2_fr))
+        word_vectors_list.append(word_vectors)
 
-        ## Save visual outputs
-        try:
-            if iteration % CONFIG.N_SAVE_VISUALS_BATCH == 0 and phase == 'val':
-                output_filename = "{}_{:04}_{:08}.png".format(model.model_name, epoch, iteration)
-                grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, train_dataset.word2vec_model)
-                model.save_img_output(grid_img_pil, output_filename)
-                # model.save_grad_output(output_filename)
-        except Exception as e:
-            print('Grid image generation failed.', e, 'Passing.')
+    wvs_tensor = torch.stack(word_vectors_list)
+    batch_size = wvs_tensor.size()[0]
 
-    total_loss_g /= (i + 1)
-    total_loss_d /= (i + 1)
-    total_loss_g_refiner /= (i + 1)
-    total_loss_d_decider /= (i + 1)
-    total_loss_g_refiner2 /= (i + 1)
-    total_loss_d_decider2 /= (i + 1)
-    total_loss_gp_fr /= (i + 1)
-    total_loss_gp_rf /= (i + 1)
-    total_loss_gp_decider_fr /= (i + 1)
-    total_loss_gp_decider2_fr /= (i + 1)
-    total_acc_rr /= (i + 1)
-    total_acc_rf /= (i + 1)
-    total_acc_fr /= (i + 1)
-    total_acc_decider_rr /= (i + 1)
-    total_acc_decider_fr /= (i + 1)
-    total_acc_decider2_rr /= (i + 1)
-    total_acc_decider2_fr /= (i + 1)
-    if CONFIG.GAN_LOSS1 == 'wgangp':
-        print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
-        print("| {p} G refiner loss: {:.4f} | {p} D decider loss: {:.4f}".format(total_loss_g_refiner, total_loss_d_decider, p=phase.title()), end=' ')
-        print("| {p} G refiner2 loss: {:.4f} | {p} D decider2 loss: {:.4f}".format(total_loss_g_refiner2, total_loss_d_decider2, p=phase.title()), end=' ')
-        print("| GP loss fake-real: {:.4f}".format(total_loss_gp_fr), end=' ')
-        print("| GP loss real-fake: {:.4f}".format(total_loss_gp_rf), end=' ')
-        print("| GP loss real refined1-fake: {:.4f}".format(total_loss_gp_decider_fr), end=' ')
-        print("| GP loss real refined2-fake: {:.4f}".format(total_loss_gp_decider2_fr))
-    else:
-        print("\t\t{p} G loss: {:.4f} | {p} D loss: {:.4f}".format(total_loss_g, total_loss_d, p=phase.title()), end=' ')
-        print("\t\t{p} G refiner loss: {:.4f} | {p} D decider loss: {:.4f}".format(total_loss_g_refiner, total_loss_d_decider, p=phase.title()))
-        print("\t\t{p} G refiner2 loss: {:.4f} | {p} D decider2 loss: {:.4f}".format(total_loss_g_refiner2, total_loss_d_decider2, p=phase.title()))
-    print("\t\tAccuracy D real-real: {:.4f} | real-fake: {:.4f} | fake-real {:.4f}".format(total_acc_rr, total_acc_rf, total_acc_fr))
-    print("\t\tAccuracy D decider real-real: {:.4f} | fake refined1-real {:.4f}".format(total_acc_decider_rr, total_acc_decider_fr))
-    print("\t\tAccuracy D decider2 real-real: {:.4f} | fake refined2-real {:.4f}".format(total_acc_decider2_rr, total_acc_decider2_fr))
-    print("\t{} time: {:.2f} seconds".format(phase.title(), time.time() - phase_start))
+    ## Forward G
+    wvs_flat = wvs_tensor.view(batch_size, -1)
+    fake_images = model.forward(model.G, wvs_flat)
 
-## Update lr
-model.update_lr(total_loss_g, total_loss_d, total_loss_g_refiner, total_loss_d_decider, total_loss_g_refiner2, total_loss_d_decider2)
+    ## Forward G_refiner
+    refined1 = model.forward(model.G_refiner, fake_images)
+    
+    ## Forward G_refiner2
+    refined2 = model.forward(model.G_refiner2, refined1)
 
-## Save model
-if epoch % CONFIG.N_SAVE_MODEL_EPOCHS == 0:
-    model.save_model_dict(epoch, iteration, total_loss_g, total_loss_d,\
-                            total_loss_g_refiner, total_loss_d_decider, total_loss_g_refiner2, total_loss_d_decider2)
+    output_filename = "output.png"
+    grid_img_pil = model.generate_grid(wvs_tensor.clone(), fake_images.clone(), refined1.clone(), refined2.clone(), refined2.clone(), word2vec_model)
+    model.save_img_test_grid(grid_img_pil, output_filename)

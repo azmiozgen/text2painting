@@ -27,10 +27,10 @@ class TextArtDataLoader(Dataset):
 
         self.word2vec_model_file = config.WORD2VEC_MODEL_FILE
         self.load_word_vectors = config.LOAD_WORD_VECTORS
-        
+
         ## Load Word2Vec model
         self.word2vec_model = Word2Vec.load(self.word2vec_model_file)
-        
+
         ## Load all word vectors (Not recommended if low on memory)
         if self.load_word_vectors:
             self.word_vectors_dict = {}
