@@ -302,9 +302,9 @@ class GANModel(BaseModel):
             print("# parameters of D decider2: {:2E}".format(sum(p.numel() for p in self.D_decider2.parameters())))
         print("Device:", self.device)
 
-        print("Parameters:")
-        print("\tBatch size:", self.batch_size)
         if self.mode in ['train']:
+            print("Parameters:")
+            print("\tBatch size:", self.batch_size)
             print("\tGAN loss1:", self.gan_loss1)
             print("\tGAN loss2:", self.gan_loss2)
             # print("\tLearning rates (G, D): {:.4f}, {:.4f}".format(G_lr, D_lr))
