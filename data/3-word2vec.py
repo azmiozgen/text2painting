@@ -35,7 +35,7 @@ class StemmingLemmatization():
             return ' '.join(txt)
 
     def get_corpus(self):
-        labels_txt = [self._clean_doc(doc) for doc in self.nlp.pipe(label_sentences, batch_size=5000, n_threads=-1)]
+        labels_txt = [self._clean_doc(doc) for doc in self.nlp.pipe(label_sentences, batch_size=500, n_threads=-1)]
         label_corpus = list(map(lambda s:str(s).split(), labels_txt))
         return label_corpus
 
