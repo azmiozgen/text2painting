@@ -219,7 +219,6 @@ class GANModel(BaseModel):
                 self.D_decider = torch.nn.DataParallel(self.D_decider)
                 self.D_decider2 = torch.nn.DataParallel(self.D_decider2)
 
-
         ## Init things (these will get values later) 
         self.state_dict = {
                           'g' : None,
@@ -291,8 +290,6 @@ class GANModel(BaseModel):
             G_refiner2_lr = self.G_refiner2_optimizer.param_groups[0]['lr']
             D_decider2_lr = self.D_decider2_optimizer.param_groups[0]['lr']
 
-        # print(self.G)
-        # print(self.D)
         print("# parameters of G: {:2E}".format(sum(p.numel() for p in self.G.parameters())))
         print("# parameters of G refiner: {:2E}".format(sum(p.numel() for p in self.G_refiner.parameters())))
         print("# parameters of G refiner2: {:2E}".format(sum(p.numel() for p in self.G_refiner2.parameters())))
@@ -735,11 +732,11 @@ class GANModel(BaseModel):
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, filename)
         img_pil.save(output_file)
-        
+
     def forward(self, net, x):
         return net(x)
 
-    def fit(self, data, phase='train', train_D=True, train_G=True, classic=True):
+    def fit(self, data, phase='train', train_D=True, train_G=True):
         ## Data to device
         real_first_images, real_second_images, real_images, real_wvs, fake_wvs = data
         real_first_images = real_first_images.to(self.device)

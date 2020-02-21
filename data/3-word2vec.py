@@ -20,7 +20,7 @@ class StemmingLemmatization():
     def __init__(self, label_sentences):
         self.nlp = spacy.load('en', disable=['ner', 'parser']) # disabling Named Entity Recognition for speed
         self.label_sentences = label_sentences
-        self.lookup = {'christmas': 'christmas'}
+        self.lookup = {'christmas':'christmas', 'arcades':'arcade', 'arcade':'arcade', 'netherlands':'netherlands'}
 
     def _clean_doc(self, doc):
         txt = []
