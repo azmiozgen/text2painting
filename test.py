@@ -125,7 +125,15 @@ if __name__ == "__main__":
         ## Save grid
         try:
             grid_filename = "{}_{:08}.png".format(model.model_name, iteration)
-            grid_img_pil = model.generate_grid(real_wvs, fake_images, refined1, refined2, real_images, val_dataset.word2vec_model)
+            grid_img_pil = model.generate_grid(real_wvs.clone(), fake_images, refined1, refined2.clone(), real_images, val_dataset.word2vec_model)
+            model.save_img_test_grid(grid_img_pil, grid_filename)
+        except Exception as e:
+            print('Grid image generation failed.', e, 'Passing.')
+
+        ## Save grid simple
+        try:
+            grid_filename = "{}_{:08}_simple.png".format(model.model_name, iteration)
+            grid_img_pil = model.generate_grid_simple(real_wvs, refined2, val_dataset.word2vec_model)
             model.save_img_test_grid(grid_img_pil, grid_filename)
         except Exception as e:
             print('Grid image generation failed.', e, 'Passing.')

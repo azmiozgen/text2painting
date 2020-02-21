@@ -224,11 +224,11 @@ class AlignCollate(object):
                 image = self.elastic_deformer(image)
 
             if self.sharpening:
-                if random.random() < 0.1:
+                if random.random() < 0.2:
                     image = image.filter(ImageFilter.SHARPEN)
 
             if self.equalizing:
-                if random.random() < 0.1:
+                if random.random() < 0.2:
                     image = ImageOps.equalize(image, mask=None)
 
         if stage == 1:

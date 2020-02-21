@@ -679,6 +679,37 @@ class GANModel(BaseModel):
         grid_pil = Image.fromarray(np.array(grid * 255, dtype=np.uint8))
         return grid_pil
 
+    def generate_grid_simple(self, real_wvs, refined2, word2vec_model):
+
+        images_bag = []
+        for real_wv, _refined2 in zip(real_wvs, refined2):
+
+            ## Get words from word vectors
+            words = []
+            for _real_wv in real_wv:
+                _real_wv = np.array(_real_wv)
+                word, prob = word2vec_model.wv.similar_by_vector(_real_wv)[0]
+                if prob > self.min_similarity_prob:  ## Eliminate noise words
+                    words.append(word)
+
+            ## Unique words are visualized by converting into image
+            words = np.unique(words)
+            word_image = words2image(words, self.config)
+
+            ## Inverse normalize
+            if self.inv_normalize:
+                _refined2 = self.inverse_normalizer(_refined2)
+
+            ## Go to cpu numpy array
+            _refined2 = _refined2.detach().cpu().numpy().transpose(1, 2, 0)
+
+            images_bag.extend([word_image, _refined2])
+
+        images_bag = np.array(images_bag)
+        grid = make_grid(torch.Tensor(images_bag.transpose(0, 3, 1, 2)), nrow=int(self.config.N_GRID_ROW / 5)).permute(1, 2, 0)
+        grid_pil = Image.fromarray(np.array(grid * 255, dtype=np.uint8))
+        return grid_pil
+
     def save_img_output(self, img_pil, filename):
         output_dir = os.path.join(self.model_dir, 'output')
         os.makedirs(output_dir, exist_ok=True)
