@@ -72,9 +72,9 @@ G_refiner2_loss,D_decider2_loss,D_rr_acc,D_rf_acc,D_fr_acc,D_decider_rr_acc,D_de
         ## GAN options
         self.N_INPUT = (self.SENTENCE_LENGTH + self.NOISE_LENGTH) * self.WV_SIZE
         self.NGF = 128
-        self.NDF = 64
+        self.NDF = 128
         self.NG_REF_F = 64
-        self.ND_DEC_F = 48
+        self.ND_DEC_F = 64
         self.OUT_CHANNELS = 1
         self.GAN_LOSS1 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
         self.GAN_LOSS2 = 'wgangp'    ## One of 'lsgan', 'vanilla', 'wgangp'
