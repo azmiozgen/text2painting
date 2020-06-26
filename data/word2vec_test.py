@@ -44,7 +44,7 @@ if __name__ == "__main__":
     print("\tVocabulary shape:", word2vec_master.wv.vectors.shape)
 
     ## Test model
-    keywords = ['dog', 'cat', 'female', 'male', 'horse']
+    keywords = ['painting', 'scenery', 'realism', 'female', 'impressionism', 'portrait', 'animal', 'male', 'horse', 'dark', 'sea', 'fantasy']
     for keyword in keywords:
         if not word2vec_master.wv.vocab.get(keyword):
             continue
