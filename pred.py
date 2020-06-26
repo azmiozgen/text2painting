@@ -81,6 +81,8 @@ if __name__ == "__main__":
     CONFIG = Config()
     if use_cpu:
         CONFIG.DEVICE = torch.device('cpu')
+    else:
+        CONFIG.DEVICE = torch.device('cuda')
 
     ## Import model
     model_dir = os.path.dirname(os.path.abspath(model_file))

@@ -338,11 +338,17 @@ class GANModel(BaseModel):
     def load_state_dict(self, model_file):
         ## Get epoch
         self.epoch = int(os.path.basename(model_file).split('_')[1]) + 1
+        
 
         if self.device == torch.device('cpu'):
+            self.G = torch.nn.DataParallel(self.G)
+            self.G_refiner = torch.nn.DataParallel(self.G_refiner)
+            self.G_refiner2 = torch.nn.DataParallel(self.G_refiner2)
             state = torch.load(model_file, map_location=lambda storage, loc: storage)
+            #state = torch.load(model_file, map_location=self.device)
         else:
             state = torch.load(model_file)
+
         self.G.load_state_dict(state['g'])
         self.G_refiner.load_state_dict(state['g_refiner'])
         self.G_refiner2.load_state_dict(state['g_refiner2'])
