@@ -71,13 +71,16 @@ if __name__ == "__main__":
     parser.add_argument('--model', type=str, required=True, help='Model file to load')
     parser.add_argument('--input', type=str, required=True, help='Input file to load')
     parser.add_argument('--output', type=str, help='Output file to save')
+    parser.add_argument('--cpu', action='store_true', help='Force to run with cpu')
     args = parser.parse_args()
     model_file = args.model
     input_file = args.input
     output_filename = args.output
+    use_cpu = args.cpu
 
     CONFIG = Config()
-    # CONFIG.DEVICE = torch.device('cpu')
+    if use_cpu:
+        CONFIG.DEVICE = torch.device('cpu')
 
     ## Import model
     model_dir = os.path.dirname(os.path.abspath(model_file))
