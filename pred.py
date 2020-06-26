@@ -70,7 +70,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, required=True, help='Model file to load')
     parser.add_argument('--input', type=str, required=True, help='Input file to load')
-    parser.add_argument('--output', type=str, help='Input file to save')
+    parser.add_argument('--output', type=str, help='Output file to save')
     args = parser.parse_args()
     model_file = args.model
     input_file = args.input
@@ -143,8 +143,16 @@ if __name__ == "__main__":
     
     ## Forward G_refiner2
     refined2 = model.forward(model.G_refiner2, refined1)
+    print("Output is generated")
 
     if not output_filename:
-        output_filename = "output.png"
+        output_grid_filename = "detailed_output.png"
+        output_simple_grid_filename = "simple_output.png"
+        output_vanilla_filename = "output.png"
     grid_img_pil = model.generate_grid(wvs_tensor.clone(), fake_images.clone(), refined1.clone(), refined2.clone(), refined2.clone(), word2vec_model)
-    model.save_img_test_grid(grid_img_pil, output_filename)
+    grid_simple_img_pil = model.generate_grid_simple(wvs_tensor.clone(), refined2.clone(), word2vec_model)
+    
+    model.save_img_test_grid(grid_img_pil, output_grid_filename, verbose=True)
+    model.save_img_test_grid(grid_simple_img_pil, output_simple_grid_filename, verbose=True)
+    model.save_img_test_single(refined2.clone(), output_vanilla_filename, kind='refined2', verbose=True)
+

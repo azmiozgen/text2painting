@@ -713,18 +713,22 @@ class GANModel(BaseModel):
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
 
-    def save_img_test_grid(self, img_pil, filename):
+    def save_img_test_grid(self, img_pil, filename, verbose=False):
         output_dir = os.path.join(self.output_dir, 'grid')
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, 'G_img_grid_' + filename)
         img_pil.save(output_file)
+        if verbose:
+            print(output_file, "saved")
 
-    def save_img_test_single(self, img_tensor, filename, kind):
+    def save_img_test_single(self, img_tensor, filename, kind, verbose=False):
 
         assert kind in ['real', 'fake', 'refined', 'refined2', 'noise']
         if self.inv_normalize:
             img_tensor = self.inverse_normalizer(img_tensor)
 
+        if len(img_tensor.shape) == 4 and img_tensor.shape[0] == 1:
+            img_tensor = img_tensor.squeeze(0)
         img = torch.Tensor(img_tensor.detach().cpu().numpy().transpose(1, 2, 0))
         img_pil = Image.fromarray(np.array(img * 255, dtype=np.uint8))
 
@@ -732,6 +736,8 @@ class GANModel(BaseModel):
         os.makedirs(output_dir, exist_ok=True)
         output_file = os.path.join(output_dir, filename)
         img_pil.save(output_file)
+        if verbose:
+            print(output_file, "saved")
 
     def forward(self, net, x):
         return net(x)
