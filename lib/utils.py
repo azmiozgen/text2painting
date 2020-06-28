@@ -220,8 +220,12 @@ def words2image(text_list, config):
     for font in config.FONTS:
         try:
             font = ImageFont.truetype(font, config.FONT_SIZE)
+            break
         except OSError:
             continue
+    else:
+        font_file = "./Lato-Bold.ttf"
+        font = ImageFont.truetype(font_file, config.FONT_SIZE)
     
     if n_column == 1:
         
