@@ -38,7 +38,11 @@ Install Spacy English language model
 
 ## Data
 
-A small sample data can be downloaded from
+You can download dataset from
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3690752.svg)](https://doi.org/10.5281/zenodo.3690752)
+
+A small sample of dataset can be downloaded from
 
 https://drive.google.com/open?id=1KXEIrRGDvASEEm-vT_jJcvFLncapJDEL
 
