@@ -1,16 +1,12 @@
-# text2painting (*Project is still under development*)
+# text2painting
 
-## Convert words into artistic painting
+## Convert keywords into painting
 
 ![definition](./assets/simple_task_definition.jpg "definition")
 
-Current results (input words - stage1 output - stage2 output - stage3 output - ground truth)
+Sample results (input words - stage1 output - stage2 output - stage3 output - ground truth)
 
-![strong_man](./assets/strong_man.jpg "strong_man")
-![horse](./assets/horse.jpg "horse")
-![horses_riders](./assets/horses_riders.jpg "horses_riders")
-![swap](./assets/swap.jpg "swap")
-![scenery](./assets/scenery.jpg "scenery")
+![results](./assets/results.jpg "results")
 
 ## Model
 
@@ -25,6 +21,10 @@ Model is built as sequential GANs with three stages
 ## Stage-2 structure
 
 ![stage2](./assets/gan2.jpg "stage2")
+
+## Stage-3 structure
+
+![stage2](./assets/gan3.jpg "stage2")
 
 ## Installation
 
