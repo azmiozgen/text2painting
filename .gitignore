@@ -10,3 +10,5 @@ data/deviantart/images
 data/wikiart/images
 
 models/*/
+
+notebooks/.ipynb_checkpoints
