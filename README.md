@@ -38,7 +38,7 @@ Install Spacy English language model
 
 ## Demo
 
-Visit painter-ai.com .
+Visit https://painter-ai.com .
 
 ## Data
 
