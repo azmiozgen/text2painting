@@ -48,6 +48,10 @@ https://drive.google.com/open?id=1KXEIrRGDvASEEm-vT_jJcvFLncapJDEL
 
 Place them under `data/deviantart_verified/images` and `data/wikiart_verified/images`
 
+## Usage
+
+Usage information will be shared here soon.
+
 ## Citation
 
 Please cite this paper
