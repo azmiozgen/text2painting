@@ -47,3 +47,9 @@ A small sample of dataset can be downloaded from
 https://drive.google.com/open?id=1KXEIrRGDvASEEm-vT_jJcvFLncapJDEL
 
 Place them under `data/deviantart_verified/images` and `data/wikiart_verified/images`
+
+## Citation
+
+Please cite this paper
+
+https://arxiv.org/abs/2007.04383
