@@ -52,9 +52,37 @@ https://drive.google.com/open?id=1KXEIrRGDvASEEm-vT_jJcvFLncapJDEL
 
 Place them under `data/deviantart_verified/images` and `data/wikiart_verified/images`
 
+## Model
+
+There are models in the same link above as well
+
+https://drive.google.com/open?id=1KXEIrRGDvASEEm-vT_jJcvFLncapJDEL
+
+Place a model directory under `models/`
+
 ## Usage
 
-Usage information will be shared here soon.
+All the necessary parameters are in `lib/config.py`
+
+### Train
+
+`python train.py`
+
+Continue training with
+
+
+`python train.py --model <model_file>`
+
+### Test
+
+`python test.py --model <model_file>`
+
+### Prediction
+
+`python pred.py --model <model_file> --input <input_text_file>`
+
+Example input text file format is `asset/input.txt` with each keyword set in a newline.
+
 
 ## Citation
 
