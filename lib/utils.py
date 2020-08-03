@@ -1,4 +1,5 @@
 from io import BytesIO, StringIO
+import os
 import uuid
 
 import numpy as np
@@ -224,7 +225,7 @@ def words2image(text_list, config):
         except OSError:
             continue
     else:
-        font_file = "./Lato-Bold.ttf"
+        font_file = os.path.abspath(os.path.join(__file__, os.path.pardir, './Lato-Bold.ttf'))
         font = ImageFont.truetype(font_file, config.FONT_SIZE)
     
     if n_column == 1:
