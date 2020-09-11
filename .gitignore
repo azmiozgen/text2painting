@@ -11,4 +11,4 @@ data/wikiart/images
 
 models/*/
 
-notebooks/.ipynb_checkpoints
+.ipynb_checkpoints/
