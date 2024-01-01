@@ -36,9 +36,9 @@ Install Spacy English language model
 
 `python -m spacy download en`
 
-## Demo
+## Gallery
 
-Visit https://painter-ai.com .
+![gallery](./assets/collage.png "gallery")
 
 ## Data
 
